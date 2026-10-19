@@ -1,0 +1,32 @@
+# Backend (Gradle/Kotlin)
+backend/build/
+backend/.gradle/
+backend/.kotlin/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# IDE / OS
+.DS_Store
+.idea/
+*.iml
+
+# Runtime data and local credentials
+*.log
+*.log.*
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Generated distribution packages (publish separately after license checks)
+BeatLinkMonitor-RaspberryPi.tar.gz
+raspberrypi-package/app/*.jar
+
+# Local upstream reference checkout, not part of this application's build
+beat-link-trigger-main/
+
+# Unmodified local Maven cache; public builds use Maven Central
+backend/local-maven-repo/org/openjfx/

@@ -1,0 +1,24 @@
+{
+  "configVersion": 1,
+  "grandMa": {
+    "enabled": false,
+    "host": "127.0.0.1",
+    "port": 30000,
+    "username": "",
+    "password": "",
+    "loginTemplate": "login \"{USERNAME}\" \"{PASSWORD}\"",
+    "commandTemplate": "SpecialMaster 3.1 At {BPM}",
+    "sendOnChange": true,
+    "minimumChange": 0.01,
+    "maximumRateHz": 10,
+    "reconnect": true,
+    "keepalive": true
+  },
+  "abletonLink": {
+    "enabled": false,
+    "carabinerHost": "127.0.0.1",
+    "carabinerPort": 17000,
+    "quantum": 4.0,
+    "positionSource": "AUTO"
+  }
+}
