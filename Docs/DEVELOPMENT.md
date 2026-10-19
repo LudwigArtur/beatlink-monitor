@@ -59,6 +59,9 @@ Tests cover BPM, master handover, slot resolution, configuration, console
 templates, locale formatting and waveform decoding, among other things.
 They do not constitute hardware validation, a security audit or show approval.
 
+GitHub Actions runs the frontend type check, backend tests and headless
+application build on pushes and pull requests using JDK 21 and Node 24.
+
 ## Distribution formats
 
 | Task | Result |
