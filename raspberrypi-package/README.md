@@ -2,7 +2,9 @@
 
 > **Source repository:** The ready-built JAR and old local TAR archive are not
 > distributed through Git. Before installation, build the headless JAR for
-> Linux ARM64 and copy it to `app/beatlink-monitor-backend.jar`.
+> Linux ARM64 by running `./scripts/package-raspberrypi.sh` from the project
+> root. This builds the matching JAR and creates the archive, including
+> project notices and the corresponding patched Beat Link source.
 > See the [build guide](../Docs/DEVELOPMENT.md#raspberry-pi-package-from-source).
 > This directory is not a complete installation package without that JAR.
 >
@@ -37,8 +39,16 @@ mouse during normal operation.
 
 ## 3. Install
 
-1. Build and populate `app/beatlink-monitor-backend.jar` as described above.
-   Transfer this entire directory to the Pi, for example using a USB drive or:
+1. Build the release archive from the project root:
+
+   ```sh
+   ./scripts/package-raspberrypi.sh
+   ```
+
+   It creates `BeatLinkMonitor-RaspberryPi.tar.gz` and updates the local JAR,
+   with the ARM64 application, installer, common license texts, project notices
+   and corresponding patched Beat Link source.
+   Transfer it to the Pi, for example using a USB drive or:
 
    ```sh
    scp -r raspberrypi-package <USER>@<PI-IP>:~/

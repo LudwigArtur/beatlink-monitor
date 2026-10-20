@@ -30,3 +30,6 @@ jobs:
       - name: Test backend and build application
         working-directory: backend
         run: ./gradlew --no-daemon test fatJarHeadless
+      - name: Build Raspberry Pi ARM64 artifact
+        working-directory: backend
+        run: ./gradlew --no-daemon -PjavafxClassifier=linux-aarch64 fatJarHeadless

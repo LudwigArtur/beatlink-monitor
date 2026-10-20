@@ -57,7 +57,7 @@ Direct dependencies are declared in
 | Ktor | 2.3.12 | Apache-2.0 |
 | kotlin-logging | 5.1.4 | Apache-2.0 |
 | Logback | 1.5.6 | EPL-1.0 / LGPL-2.1 dual license |
-| OpenJFX | 21.0.2 | GPL-2.0 with Classpath Exception; additional component notices apply |
+| OpenJFX | 21.0.2 (desktop); 22.0.2 (Linux ARM64) | GPL-2.0 with Classpath Exception; additional component notices apply |
 | Svelte | ^5.57.0 | MIT |
 | Vite / Svelte Vite plugin | ^8.3.0 / ^7.3.0 | MIT |
 | TypeScript | ~6.0.2 | Apache-2.0 |
@@ -66,7 +66,10 @@ Direct dependencies are declared in
 This table is not a complete transitive dependency or binary-license inventory.
 Beat Link transitively uses, among others, Remote Tea (LGPL-2.0) and the
 Kaitai Struct Java runtime (MIT). Other resolved components include Netty,
-SLF4J and their own dependencies. Distribution obligations must be assessed
+SLF4J and their own dependencies. The corresponding common license texts
+included with the project are in [`licenses/`](licenses/): Apache-2.0,
+Classpath Exception 2.0, EPL-1.0, EPL-2.0, GPL-2.0, LGPL-2.0, LGPL-2.1 and
+the Kaitai runtime's MIT notice. Distribution obligations must be assessed
 against the actual resolved release, not only this overview.
 
 Unmodified local OpenJFX mirror files are excluded from source publication;

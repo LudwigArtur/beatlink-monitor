@@ -9,12 +9,15 @@ version = "0.1.0"
 
 repositories {
     // Required patched Beat Link artifact and optional local JavaFX mirror.
-    maven { url = uri("local-maven-repo") }
+    maven {
+        url = uri("local-maven-repo")
+        content { includeGroup("org.deepsymmetry") }
+    }
     mavenCentral()
 }
 
 val ktorVersion = "2.3.12"
-val javafxVersion = "21.0.2"
+val defaultJavafxVersion = "21.0.2"
 
 /**
  * JavaFX publishes separate artifacts per OS/architecture (no "universal"
@@ -41,6 +44,9 @@ fun detectJavafxClassifier(): String {
 }
 
 val javafxClassifier = detectJavafxClassifier()
+// OpenJFX did not publish a Linux ARM64 classifier until JavaFX 22.
+// Version 22.0.2 still runs on the project's JDK 21 baseline.
+val javafxVersion = if (javafxClassifier == "linux-aarch64") "22.0.2" else defaultJavafxVersion
 
 dependencies {
     // Native desktop control window/browser launcher, platform-specific per

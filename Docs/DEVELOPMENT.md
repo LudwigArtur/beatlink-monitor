@@ -61,6 +61,7 @@ They do not constitute hardware validation, a security audit or show approval.
 
 GitHub Actions runs the frontend type check, backend tests and headless
 application build on pushes and pull requests using JDK 21 and Node 24.
+The workflow also builds the Linux ARM64 headless artifact.
 
 ## Distribution formats
 
@@ -70,7 +71,9 @@ application build on pushes and pull requests using JDK 21 and Node 24.
 | `fatJar` | Runnable desktop JAR with JavaFX dependencies |
 | `jpackageMac` | Local macOS app image with runtime |
 
-JavaFX artifacts are platform-dependent. For example, for Linux ARM64:
+JavaFX artifacts are platform-dependent. OpenJFX did not publish a Linux ARM64
+classifier for 21.0.2, so the build selects 22.0.2 for Linux ARM64 (compatible
+with the JDK 21 baseline); other platforms keep JavaFX 21.0.2. For example:
 
 ```sh
 ./gradlew -PjavafxClassifier=linux-aarch64 fatJarHeadless
@@ -82,10 +85,14 @@ this does not create a native cross-platform desktop app.
 
 ## Raspberry Pi package from source
 
-1. Build the headless JAR with `-PjavafxClassifier=linux-aarch64`.
-2. Copy it to `raspberrypi-package/app/beatlink-monitor-backend.jar`.
-3. Supply required licenses, notices and corresponding source.
-4. Only then create a release archive and test it on a Pi.
+Run `./scripts/package-raspberrypi.sh` from the repository root. The script
+builds the JAR with `-PjavafxClassifier=linux-aarch64`, creates a temporary
+staging directory, adds the required project notices and corresponding
+patched Beat Link source, and generates `BeatLinkMonitor-RaspberryPi.tar.gz`.
+An optional first argument overrides the output archive path.
+
+Inspect the archive contents and dependency licenses before distribution, then
+install and test it on an actual Raspberry Pi.
 
 The old local TAR/JAR is deliberately not part of the source repository.
 The Pi installation scripts do not replace a build and require the JAR.
