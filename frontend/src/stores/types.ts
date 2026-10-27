@@ -213,6 +213,7 @@ export interface UtilityItem {
 }
 
 export interface MixerLinkStatus {
+  mixerModel: string | null;
   integrationEnabled: boolean;
   controlEnabled: boolean;
   transportAvailable: boolean;

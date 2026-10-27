@@ -261,7 +261,7 @@
       <h3>Mixer</h3>
       <p class="hint">
         Reads the live state of a DJM mixer (EQ, faders, crossfader, FX), its utility settings and firmware version.
-        Checked on one rig (DJM-V10, CDJ-3000). Changing a setting only happens when you press Write in the Mixer
+        Checked with a DJM-V10, a DJM-A9 and CDJ-3000s. Changing a setting only happens when you press Write in the Mixer
         tab, and counts as confirmed only after the mixer reports the new value back. See Docs/MIXER_CONTROL.md.
       </p>
       <label title="Listens for the mixer's live knob and fader positions and allows reading its utility settings. Hooks into the Pro DJ Link socket at startup, so a restart is required.">

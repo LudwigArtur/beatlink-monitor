@@ -105,7 +105,7 @@
         <li>Integration: <b>{link.integrationEnabled ? 'enabled' : 'disabled'}</b> (Settings → Mixer)</li>
         <li>Changing settings: <b>{link.controlEnabled ? 'allowed' : 'not allowed'}</b></li>
         <li>Pro DJ Link socket hooked: <b>{link.transportAvailable ? 'yes' : 'no'}</b></li>
-        <li>Mixer address: <b>{link.mixerAddress ?? 'unknown'}</b></li>
+        <li>Mixer: <b>{link.mixerModel ?? 'unknown'}</b>, address <b>{link.mixerAddress ?? 'unknown'}</b></li>
         <li>
           Live frames received: <b>{link.liveFramesReceived}</b>
           {#if link.lastLiveFrameAgeMs != null}(last {(link.lastLiveFrameAgeMs / 1000).toFixed(1)} s ago){/if}
