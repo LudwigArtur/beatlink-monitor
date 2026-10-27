@@ -46,6 +46,8 @@ class ApplicationState {
     private val networkAvailable = AtomicBoolean(true)
 
     fun upsertPlayer(deviceNumber: Int, transform: (PlayerState) -> PlayerState) {
+        // Real device numbers fit in seven bits; an obfuscated id (bit 7 set) that slipped through is never a device.
+        if (deviceNumber !in 1..127) return
         var wasNew = false
         var previousTitle: String? = null
         var previousArtist: String? = null

@@ -136,10 +136,15 @@ class ProDjLinkAdapter(
         return bytes.size > 0x34 && bytes[0x34].toInt() == 3
     }
 
-    private val deviceUpdateListener = DeviceUpdateListener { update -> handleUpdate(update) }
+    // Real device numbers fit in seven bits. Frames that third-party peers receive carry an obfuscated id with bit 7
+    // set (see VirtualCdjMixerTransport); one that slips through before the socket hook is installed must not
+    // turn into a phantom player.
+    private fun isRealDeviceNumber(number: Int) = number in 1..127
+
+    private val deviceUpdateListener = DeviceUpdateListener { update -> if (isRealDeviceNumber(update.deviceNumber)) handleUpdate(update) }
 
     private val beatListener = org.deepsymmetry.beatlink.BeatListener { beat: Beat ->
-        state.beatOccurred(beat.deviceNumber, deriveBeatNumber(beat.deviceNumber), beat.beatWithinBar)
+        if (isRealDeviceNumber(beat.deviceNumber)) state.beatOccurred(beat.deviceNumber, deriveBeatNumber(beat.deviceNumber), beat.beatWithinBar)
     }
 
     init {

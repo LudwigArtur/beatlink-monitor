@@ -73,6 +73,36 @@ class VirtualCdjMixerTransportTest {
         assertTrue(real.isClosed)
     }
 
+    @Test
+    fun `beat socket tap consumes audio levels and drops the obfuscated copy of position frames`() {
+        val tapped = mutableListOf<ByteArray>()
+        val real = DatagramSocket(0, loopback)
+        val sender = DatagramSocket(0, loopback)
+        val wrapper = VirtualCdjMixerTransport.TappingSocket(real, null, setOf(0x58)) { data, length -> tapped += data.copyOf(length) }
+        try {
+            val buffer = ByteArray(512)
+            val packet = DatagramPacket(buffer, buffer.size)
+            wrapper.soTimeout = 2000
+            fun frame(type: Int, size: Int, idByte: Int) =
+                ByteArray(size).also { "Qspt1WmJOL".toByteArray().copyInto(it); it[0x0a] = type.toByte(); it[0x21] = idByte.toByte() }
+            val levels = frame(0x58, 512, 0x9b)
+            val obfuscatedPosition = frame(0x0b, 60, 0x9c)
+            val plainPosition = frame(0x0b, 60, 3)
+            for (d in listOf(levels, obfuscatedPosition, plainPosition)) sender.send(DatagramPacket(d, d.size, loopback, real.localPort))
+
+            packet.length = buffer.size
+            wrapper.receive(packet)
+
+            assertEquals(60, packet.length)
+            assertEquals(3, buffer[0x21].toInt())
+            assertEquals(1, tapped.size)
+            assertEquals(0x58, tapped[0][0x0a].toInt())
+        } finally {
+            wrapper.close()
+            sender.close()
+        }
+    }
+
     private fun liveState() = MixerLiveState(
         channels = (1..6).map { MixerChannelState(it, 0, 1, 2, 3, 4, 5, 6, 7, 8, false, 9, 10, 0) },
         crossfader = 1, masterLevel = 2, masterFilter = 3, masterCue = 4, isolatorOn = 5, isoHi = 6, isoMid = 7,

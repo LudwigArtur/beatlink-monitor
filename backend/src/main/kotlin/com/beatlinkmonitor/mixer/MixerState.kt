@@ -30,6 +30,8 @@ data class MixerLinkStatus(
     val controlEnabled: Boolean,
     val transportAvailable: Boolean,
     val mixerAddress: String?,
+    /** Device name the mixer announces (e.g. "DJM-V10"), so it is always clear which model the data belongs to. */
+    val mixerModel: String?,
     val liveFramesReceived: Long,
     val utilityRepliesReceived: Long,
     val lastLiveFrameAgeMs: Long?,

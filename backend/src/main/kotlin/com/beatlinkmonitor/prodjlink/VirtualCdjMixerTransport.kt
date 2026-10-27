@@ -135,13 +135,17 @@ class VirtualCdjMixerTransport(
         return field.get(beatFinder) as AtomicReference<DatagramSocket>
     }
 
-    /** Same tap on beat-link's beat socket (UDP 50001), where the mixer's audio-level frames arrive. */
+    /**
+     * Same tap on beat-link's beat socket (UDP 50001): the mixer's audio-level frames are consumed, and the second
+     * copy of each position frame that players send to third-party peers with an obfuscated id is dropped, because
+     * beat-link would turn it into phantom players.
+     */
     fun ensureBeatSocketInstalled() {
         if (onBeatPacket == null || !beatFinder.isRunning) return
         val reference = beatSocketReference()
         val current = reference.get() ?: return
         if (current is TappingSocket) return
-        val wrapper = TappingSocket(current, recorder, setOf(AudioLevelProtocol.TYPE_LEVELS), dropObfuscated = false) { data, length -> onBeatPacket.invoke(data, length) }
+        val wrapper = TappingSocket(current, recorder, setOf(AudioLevelProtocol.TYPE_LEVELS)) { data, length -> onBeatPacket.invoke(data, length) }
         if (reference.compareAndSet(current, wrapper)) {
             logger.info { "Mixer integration: hooked the Pro DJ Link beat socket" }
         }

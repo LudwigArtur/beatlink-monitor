@@ -61,4 +61,15 @@ class ApplicationStateTest {
         assertTrue(state.masterClock.value.valid)
         assertEquals(1, state.masterClock.value.masterPlayerNumber)
     }
+
+    @Test
+    fun `obfuscated or invalid device numbers never become players`() = runTest {
+        val state = ApplicationState()
+
+        state.upsertPlayer(205) { it.copy(connected = true) }
+        state.upsertPlayer(0) { it.copy(connected = true) }
+        state.upsertPlayer(3) { it.copy(connected = true) }
+
+        assertEquals(listOf(3), state.players.value.keys.toList())
+    }
 }

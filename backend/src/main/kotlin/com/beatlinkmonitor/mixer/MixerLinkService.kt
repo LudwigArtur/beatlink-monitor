@@ -63,7 +63,7 @@ class MixerLinkService(
         const val WRITE_READBACK_DELAY_MS = 150L
         const val REPLY_TIMEOUT_MS = 1500L
         private const val SUPERVISOR_INTERVAL_MS = 1000L
-        private const val INSTALL_CHECK_TICKS = 5L
+        private const val INSTALL_CHECK_TICKS = 1L
         private const val VERSION_PROBE_TICKS = 5L
         const val LIVE_STALE_AFTER_MS = 5000L
         private const val UTILITY_REFRESH_MS = 60_000L
@@ -170,6 +170,7 @@ class MixerLinkService(
             controlEnabled = cfg.mixerControlEnabled,
             transportAvailable = realTransport.available,
             mixerAddress = currentMixerAddress(),
+            mixerModel = state.players.value.values.firstOrNull { it.deviceType == DeviceType.MIXER }?.deviceName?.takeIf { it.isNotBlank() },
             liveFramesReceived = liveFrames.get(),
             utilityRepliesReceived = utilityReplies.get(),
             lastLiveFrameAgeMs = if (last == 0L) null else System.currentTimeMillis() - last,
