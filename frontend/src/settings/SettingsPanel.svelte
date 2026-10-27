@@ -284,10 +284,6 @@
         <input type="checkbox" bind:checked={appConfig.cdjControlEnabled} disabled={!appConfig.cdjIntegrationEnabled} />
         Allow changing CDJ settings
       </label>
-      <label title="Allows pressing CDJ buttons remotely (play, cue, hot cues, loops, beat jumps). This acts on live playback and anyone who can reach the web UI could use it. Off by default.">
-        <input type="checkbox" bind:checked={appConfig.cdjRemoteEnabled} disabled={!appConfig.cdjIntegrationEnabled} />
-        Allow remote CDJ buttons (affects playback!)
-      </label>
       <label class="wide-field" title="IPv4 address of the mixer on the local network. Leave empty to use the mixer found by Pro DJ Link discovery.">
         Mixer address (optional)
         <input placeholder="e.g. 169.254.12.34" value={appConfig.mixerAddress ?? ''}

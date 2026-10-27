@@ -1,10 +1,12 @@
-import { API_BASE } from '../websocket/connection';
+import { API_BASE, currentConnectionId } from '../websocket/connection';
 import type {
   ApplicationConfig,
   ApplicationConfigSaveResult,
   AudioLevelStatus,
   BeatGridResponse,
   CdjRemoteResult,
+  RemoteUnlockInfo,
+  RemoteUnlockResult,
   CdjSnapshot,
   CdjWriteResult,
   MixerSnapshot,
@@ -26,6 +28,11 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   }
   const text = await response.text();
   return text ? (JSON.parse(text) as T) : (undefined as T);
+}
+
+/** Remote CDJ calls identify the WebSocket connection whose PIN unlock they rely on. */
+function remoteOptions(options: RequestInit = {}): RequestInit {
+  return { ...options, headers: { 'Content-Type': 'application/json', 'X-Connection-Id': currentConnectionId ?? '' } };
 }
 
 export const api = {
@@ -56,7 +63,14 @@ export const api = {
   cdjWriteSetting: (player: number, offset: number, value: number) =>
     request<CdjWriteResult>(`/api/cdj/${player}/setting/${offset}`, { method: 'POST', body: JSON.stringify({ value }) }),
   cdjButton: (player: number, code: number, press: 'click' | 'down' | 'up' = 'click') =>
-    request<CdjRemoteResult>(`/api/cdj/${player}/button/${code}?press=${press}`, { method: 'POST' }),
+    request<CdjRemoteResult>(`/api/cdj/${player}/button/${code}?press=${press}`, remoteOptions({ method: 'POST' })),
+  cdjRemoteInfo: () => request<RemoteUnlockInfo>('/api/cdj/remote', remoteOptions()),
+  cdjRemoteLock: () => request<unknown>('/api/cdj/remote/lock', remoteOptions({ method: 'POST' })),
+  /** Unlike other calls this one also returns the body of a rejected PIN (403/409/429). */
+  cdjRemoteUnlock: async (pin: string): Promise<RemoteUnlockResult> => {
+    const response = await fetch(`${API_BASE}/api/cdj/remote/unlock`, remoteOptions({ method: 'POST', body: JSON.stringify({ pin }) }));
+    return (await response.json()) as RemoteUnlockResult;
+  },
   mixerWriteUtility: (id: number, value: number) =>
     request<UtilityWriteResult>(`/api/mixer/utility/${id}`, { method: 'POST', body: JSON.stringify({ value }) }),
 

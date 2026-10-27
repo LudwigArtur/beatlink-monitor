@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
   import { api } from '../stores/api';
-  import type { CdjRemoteButton, CdjRemoteResult, CdjSettingItem, CdjSnapshot, CdjWriteResult } from '../stores/types';
+  import type { CdjDeckFlags, CdjRemoteButton, CdjRemoteResult, CdjSettingItem, CdjSnapshot, CdjWriteResult, RemoteUnlockInfo } from '../stores/types';
+  import { connectionId } from '../websocket/connection';
 
   let snapshot: CdjSnapshot | null = null;
   let selected = 0;
@@ -13,6 +14,44 @@
   let results: Record<string, CdjWriteResult> = {};
   let writing: Record<string, boolean> = {};
   let remoteResult: CdjRemoteResult | null = null;
+  let remoteInfo: RemoteUnlockInfo | null = null;
+  let pin = '';
+  let pinMessage = '';
+
+  async function refreshRemote() {
+    try {
+      remoteInfo = await api.cdjRemoteInfo();
+    } catch (e) {
+      remoteInfo = null;
+    }
+  }
+
+  // The unlock belongs to the WebSocket connection: a new connection starts locked again.
+  $: if ($connectionId !== undefined) {
+    pin = '';
+    pinMessage = '';
+    remoteResult = null;
+    void refreshRemote();
+  }
+
+  async function unlock() {
+    const result = await api.cdjRemoteUnlock(pin);
+    pin = '';
+    pinMessage = {
+      UNLOCKED: '',
+      WRONG_PIN: 'Wrong PIN.',
+      NO_PIN_FILE: 'No PIN file on the server yet.',
+      INVALID_PIN_FILE: 'The PIN file on the server is too short (at least 4 characters).',
+      LOCKED_OUT: `Too many attempts. Try again in ${result.retryAfterSeconds ?? 60} s.`,
+      UNKNOWN_CONNECTION: 'Not connected to the backend; try again in a moment.',
+    }[result.status];
+    await refreshRemote();
+  }
+
+  async function lockAgain() {
+    await api.cdjRemoteLock();
+    await refreshRemote();
+  }
 
   async function refresh() {
     try {
@@ -83,19 +122,25 @@
     try {
       remoteResult = await api.cdjButton(selected, button.code, mode);
     } catch (e) {
-      remoteResult = { status: 'FAILED', message: 'Request failed' };
+      remoteResult = { status: 'FAILED', message: 'Request failed - locked? Enter the PIN again.' };
+      await refreshRemote();
     }
   }
 
-  const flagLabels: [string, string, boolean][] = [
+  // [flag, label, verified on real CDJ-3000s]
+  const flagRows: [keyof CdjDeckFlags, string, boolean][] = [
+    ['tempoReset', 'Tempo Reset', true],
+    ['sync', 'Sync', true],
+    ['keySync', 'Key Sync', true],
     ['masterTempo', 'Master Tempo', true],
+    ['quantize', 'Quantize', true],
+    ['slip', 'Slip', true],
     ['vinylMode', 'Vinyl mode', true],
     ['autoCue', 'Auto Cue', true],
-    ['quantize', 'Quantize', true],
-    ['slip', 'Slip', false],
-    ['keySync', 'Key Sync', false],
-    ['tempoReset', 'Tempo Reset', false],
+    ['tempoMaster', 'Tempo master', false],
   ];
+
+  const show = (value: boolean | number) => (typeof value === 'boolean' ? (value ? 'on' : 'off') : String(value));
 </script>
 
 <div class="panel">
@@ -106,7 +151,7 @@
       <ul class="status">
         <li>Integration: {link.integrationEnabled ? 'on' : 'off'}, socket hooked: {link.transportAvailable ? 'yes' : 'no'}</li>
         <li>Replies: {link.settingsRepliesReceived} settings, {link.statusRepliesReceived} deck flags</li>
-        <li>Settings changes: {link.controlEnabled ? 'allowed' : 'disabled'}, remote buttons: {link.remoteEnabled ? 'allowed' : 'disabled'}</li>
+        <li>Settings changes: {link.controlEnabled ? 'allowed' : 'disabled'}</li>
         {#if link.lastError}<li class="warn">Last error: {link.lastError}</li>{/if}
       </ul>
     {/if}
@@ -121,13 +166,15 @@
 
   {#if device}
     <section>
-      <h3>Deck flags (player {device.deviceNumber})</h3>
-      <p class="hint">Names marked * are inferred from the order of the fields; the unmarked ones were matched against the CDJ's own settings.</p>
+      <h3>Deck state (player {device.deviceNumber})</h3>
+      <p class="hint">Verified against real CDJ-3000s by switching the function on the player; * = matches a CDJ value but was not switched.</p>
       {#if device.flags}
         <table>
           <tbody>
-            {#each flagLabels as [flag, label, verified]}
-              <tr><td>{label}{verified ? '' : ' *'}</td><td>{device.flags[flag as keyof typeof device.flags]}</td></tr>
+            <tr><td>Track BPM</td><td>{device.flags.trackBpm.toFixed(2)}</td></tr>
+            <tr><td>Pitch</td><td>{device.flags.pitchPercent.toFixed(2)} %</td></tr>
+            {#each flagRows as [flag, label, verified]}
+              <tr><td>{label}{verified ? '' : ' *'}</td><td>{show(device.flags[flag])}</td></tr>
             {/each}
           </tbody>
         </table>
@@ -160,14 +207,29 @@
       </table>
     </section>
 
-    {#if link?.remoteEnabled}
-      <section>
-        <h3>Remote buttons (player {device.deviceNumber})</h3>
-        <p class="warn">These act immediately on the player, including during playback. Not acknowledged by the CDJ.</p>
+    <section>
+      <h3>Remote buttons (player {device.deviceNumber})</h3>
+      {#if !remoteInfo}
+        <p class="hint">Status unknown.</p>
+      {:else if !remoteInfo.unlocked}
+        <p class="hint">
+          Remote buttons act immediately on the player, including during playback, so they are locked. Each device
+          has to unlock them after every connection with the PIN from the file <code>{remoteInfo.pinFileName}</code>
+          in the backend's data directory on the server (create it there; the app never creates it).
+        </p>
+        {#if !remoteInfo.pinFilePresent}<p class="warn">The PIN file does not exist (or is too short) on the server.</p>{/if}
+        <form class="row" on:submit|preventDefault={unlock}>
+          <input type="password" inputmode="numeric" autocomplete="off" placeholder="PIN" bind:value={pin} />
+          <button type="submit" disabled={!pin || !remoteInfo.pinFilePresent}>Unlock</button>
+        </form>
+        {#if pinMessage}<p class="warn">{pinMessage}</p>{/if}
+      {:else}
+        <p class="warn">Unlocked for this connection. These buttons act immediately on the player. Not acknowledged by the CDJ.</p>
+        <div class="row"><button on:click={lockAgain}>Lock again</button></div>
         {#each groups as group}
           <h4>{group}</h4>
           <div class="row">
-            {#each link.buttons.filter((b) => b.group === group) as button (button.code)}
+            {#each link?.buttons.filter((b) => b.group === group) ?? [] as button (button.code)}
               {#if button.key === 'cue'}
                 <button on:mousedown={() => press(button, 'down')} on:mouseup={() => press(button, 'up')}>{button.label} (hold)</button>
               {:else}
@@ -177,8 +239,8 @@
           </div>
         {/each}
         {#if remoteResult}<p class:ok={remoteResult.status === 'SENT'}>{remoteResult.status}{remoteResult.message ? `: ${remoteResult.message}` : ''}</p>{/if}
-      </section>
-    {/if}
+      {/if}
+    </section>
   {/if}
 </div>
 

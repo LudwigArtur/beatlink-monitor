@@ -141,7 +141,6 @@ export interface ApplicationConfig {
   mixerAnnounceIdentity: boolean;
   cdjIntegrationEnabled: boolean;
   cdjControlEnabled: boolean;
-  cdjRemoteEnabled: boolean;
   mixerIdentityName: string;
 }
 
@@ -279,15 +278,18 @@ export interface CdjRemoteButton {
 }
 
 export interface CdjDeckFlags {
-  tempoReset: number;
-  tempoRatio: number;
-  masterTempo: number;
-  keySync: number;
-  vinylMode: number;
-  vinylSpeed: number;
-  slip: number;
-  autoCue: number;
-  quantize: number;
+  tempoReset: boolean;
+  trackBpm: number;
+  pitchPercent: number;
+  masterTempo: boolean;
+  keySync: boolean;
+  sync: boolean;
+  tempoMaster: boolean;
+  vinylMode: boolean;
+  unknown31: number;
+  slip: boolean;
+  autoCue: boolean;
+  quantize: boolean;
 }
 
 export interface CdjDeviceState {
@@ -301,7 +303,6 @@ export interface CdjDeviceState {
 export interface CdjLinkStatus {
   integrationEnabled: boolean;
   controlEnabled: boolean;
-  remoteEnabled: boolean;
   transportAvailable: boolean;
   settingsRepliesReceived: number;
   statusRepliesReceived: number;
@@ -324,8 +325,19 @@ export interface CdjWriteResult {
   message: string | null;
 }
 
+export interface RemoteUnlockInfo {
+  pinFileName: string;
+  pinFilePresent: boolean;
+  unlocked: boolean;
+}
+
+export interface RemoteUnlockResult {
+  status: 'UNLOCKED' | 'WRONG_PIN' | 'NO_PIN_FILE' | 'INVALID_PIN_FILE' | 'LOCKED_OUT' | 'UNKNOWN_CONNECTION';
+  retryAfterSeconds: number | null;
+}
+
 export interface CdjRemoteResult {
-  status: 'SENT' | 'REMOTE_DISABLED' | 'NO_DEVICE' | 'INVALID' | 'FAILED';
+  status: 'SENT' | 'NO_DEVICE' | 'INVALID' | 'FAILED';
   message: string | null;
 }
 

@@ -25,6 +25,9 @@ export const masterClock = writable<MasterClockState>({
 export const outputs = writable<OutputStatus[]>([]);
 export const mixerState = writable<MixerState>({ live: null, liveTimestampMs: 0, utilities: [], version: null });
 export const diagnostics = writable<DiagnosticsSnapshot | null>(null);
+/** Id of the current WebSocket connection; the CDJ remote-button unlock belongs to it and ends with it. */
+export let currentConnectionId: string | null = null;
+export const connectionId = writable<string | null>(null);
 export const connectionStatus = writable<'connecting' | 'open' | 'closed'>('connecting');
 
 let socket: WebSocket | null = null;
@@ -46,7 +49,10 @@ export function connectWebSocket(): void {
   socket.onmessage = (event) => {
     try {
       const message = JSON.parse(event.data);
-      if (message.type === 'state') {
+      if (message.type === 'hello') {
+        currentConnectionId = message.connectionId;
+        connectionId.set(message.connectionId);
+      } else if (message.type === 'state') {
         players.set(message.players);
         masterClock.set(message.masterClock);
         outputs.set(message.outputs);
@@ -60,6 +66,8 @@ export function connectWebSocket(): void {
   };
 
   socket.onclose = () => {
+    currentConnectionId = null;
+    connectionId.set(null);
     connectionStatus.set('closed');
     scheduleReconnect();
   };
