@@ -1,6 +1,5 @@
 package com.beatlinkmonitor.state
 
-import com.beatlinkmonitor.model.PlayerSource
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -15,7 +14,7 @@ class ApplicationStateTest {
         assertFalse(state.masterClock.value.valid)
 
         state.upsertPlayer(1) {
-            it.copy(tempoMaster = true, originalBpm = 140.0, effectiveBpm = 140.0, source = PlayerSource.SIMULATED)
+            it.copy(tempoMaster = true, originalBpm = 140.0, effectiveBpm = 140.0)
         }
 
         assertTrue(state.masterClock.value.valid)

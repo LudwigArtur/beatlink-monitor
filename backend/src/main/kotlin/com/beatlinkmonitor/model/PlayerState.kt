@@ -31,11 +31,9 @@ enum class WaveformType {
 }
 
 /**
- * Central per-player state, fed either by the real Pro DJ Link network
- * (via [com.beatlinkmonitor.prodjlink.ProDjLinkAdapter]) or by the
- * [com.beatlinkmonitor.simulator.SimulationService]. Both sources populate the
- * exact same model so downstream consumers (UI, outputs) never need to care
- * where the data came from (requirements specification §17.1, §20, coding guideline #6).
+ * Central per-player state, fed by the real Pro DJ Link network (via
+ * [com.beatlinkmonitor.prodjlink.ProDjLinkAdapter]); downstream consumers (UI,
+ * outputs) only ever see this model (requirements specification §17.1, §20).
  */
 @Serializable
 data class PlayerState(
@@ -50,7 +48,7 @@ data class PlayerState(
     val onAir: Boolean = false,
     // Directly reported by real Pro DJ Link hardware via `CdjStatus`'s
     // `PlayState1.LOOPING` value - not inferred/guessed (coding guideline
-    // #13). Mixers and the simulator never report this (no loop concept
+    // #13). Mixers never report this (no loop concept
     // there), so it simply stays `false` for them.
     val looping: Boolean = false,
     // Pro DJ Link's status packets only ever report *whether* a loop is
@@ -82,17 +80,10 @@ data class PlayerState(
     val hasBeatGrid: Boolean = false,
     val lastUpdateTimestamp: Long = 0L,
     val dataAvailability: Map<String, Availability> = emptyMap(),
-    val source: PlayerSource = PlayerSource.REAL,
 ) {
     companion object {
         /** A freshly discovered but not-yet-populated player. */
-        fun empty(deviceNumber: Int, source: PlayerSource = PlayerSource.REAL): PlayerState =
-            PlayerState(deviceNumber = deviceNumber, source = source)
+        fun empty(deviceNumber: Int): PlayerState = PlayerState(deviceNumber = deviceNumber)
     }
 }
 
-@Serializable
-enum class PlayerSource {
-    REAL,
-    SIMULATED,
-}

@@ -2,7 +2,6 @@ package com.beatlinkmonitor.prodjlink
 
 import com.beatlinkmonitor.model.BpmMath
 import com.beatlinkmonitor.model.DeviceType
-import com.beatlinkmonitor.model.PlayerSource
 import com.beatlinkmonitor.model.WaveformType
 import com.beatlinkmonitor.state.ApplicationState
 import com.beatlinkmonitor.waveform.CachedWaveform
@@ -118,7 +117,9 @@ class ProDjLinkAdapter(
                     connected = true,
                     deviceName = announcement.deviceName,
                     ipAddress = announcement.address.hostAddress,
-                    source = PlayerSource.REAL,
+                    // Keep-alive category byte 3 = mixer (observed on a real DJM-V10); mixers do not necessarily
+                    // send us mixer status packets, which is the other way a device is recognised as a mixer.
+                    deviceType = if (isMixerAnnouncement(announcement)) DeviceType.MIXER else player.deviceType,
                 )
             }
         }
@@ -128,6 +129,11 @@ class ProDjLinkAdapter(
             waveformCache.evictForPlayer(announcement.deviceNumber)
             state.removePlayer(announcement.deviceNumber)
         }
+    }
+
+    private fun isMixerAnnouncement(announcement: DeviceAnnouncement): Boolean {
+        val bytes = announcement.packetBytes
+        return bytes.size > 0x34 && bytes[0x34].toInt() == 3
     }
 
     private val deviceUpdateListener = DeviceUpdateListener { update -> handleUpdate(update) }
@@ -267,7 +273,6 @@ class ProDjLinkAdapter(
                 effectiveBpm = effectiveBpm ?: update.effectiveTempo,
                 beatWithinBar = if (update.isBeatWithinBarMeaningful) update.beatWithinBar else player.beatWithinBar,
                 playbackPositionMs = positionMs ?: player.playbackPositionMs,
-                source = PlayerSource.REAL,
             )
 
             if (update is CdjStatus) {
@@ -329,8 +334,8 @@ class ProDjLinkAdapter(
     /**
      * Starts every `beat-link` subsystem. Each one is isolated in its own
      * try/catch so a single failure (e.g. no matching network interface yet)
-     * never prevents the rest of the application - including the simulator
-     * and the web UI - from working (requirements specification §23).
+     * never prevents the rest of the application - including the web UI -
+     * from working (requirements specification §23).
      *
      * When [manualInterfaceName] is given (requirements specification §28.1), every other
      * local network interface's addresses are added to `beat-link`'s ignore
@@ -520,7 +525,7 @@ class ProDjLinkAdapter(
     private fun checkMetadataHealth() {
         val now = System.currentTimeMillis()
         val currentlyStuck = state.players.value.values
-            .filter { it.connected && it.source == PlayerSource.REAL && it.originalBpm != null && it.title == null && it.rekordboxTrackId == null }
+            .filter { it.connected && it.originalBpm != null && it.title == null && it.rekordboxTrackId == null }
             .map { it.deviceNumber }
             .toSet()
 

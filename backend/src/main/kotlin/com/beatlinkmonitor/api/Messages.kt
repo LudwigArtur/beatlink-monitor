@@ -1,6 +1,7 @@
 package com.beatlinkmonitor.api
 
 import com.beatlinkmonitor.diagnostics.DiagnosticsSnapshot
+import com.beatlinkmonitor.mixer.MixerState
 import com.beatlinkmonitor.model.MasterClockState
 import com.beatlinkmonitor.model.PlayerState
 import com.beatlinkmonitor.outputs.OutputStatus
@@ -15,6 +16,7 @@ data class StateSnapshotMessage(
     val players: List<PlayerState>,
     val masterClock: MasterClockState,
     val outputs: List<OutputStatus>,
+    val mixer: MixerState = MixerState(),
 ) : ServerMessage
 
 @Serializable

@@ -3,7 +3,6 @@ package com.beatlinkmonitor.diagnostics
 import com.beatlinkmonitor.outputs.OutputManager
 import com.beatlinkmonitor.prodjlink.NetworkInterfaceService
 import com.beatlinkmonitor.prodjlink.ProDjLinkAdapter
-import com.beatlinkmonitor.simulator.SimulationService
 import com.beatlinkmonitor.state.ApplicationState
 import kotlinx.serialization.Serializable
 
@@ -22,7 +21,6 @@ data class DiagnosticsSnapshot(
     val telnetConnected: Boolean,
     val lastTelnetCommand: String?,
     val uiWebSocketConnections: Int,
-    val simulatorRunning: Boolean,
     val logDirectory: String,
     val ownDeviceNumber: Int?,
 )
@@ -33,15 +31,11 @@ data class DiagnosticsSnapshot(
 class DiagnosticsService(
     private val applicationState: ApplicationState,
     private val proDjLinkAdapter: ProDjLinkAdapter,
-    private val simulationService: SimulationService,
     private val outputManager: OutputManager,
     private val version: String,
 ) {
     @Volatile
     var uiWebSocketConnections: Int = 0
-
-    @Volatile
-    var simulatorRunning: Boolean = false
 
     fun snapshot(): DiagnosticsSnapshot {
         val statuses = outputManager.statuses()
@@ -62,7 +56,6 @@ class DiagnosticsService(
             telnetConnected = grandMa?.connected ?: false,
             lastTelnetCommand = grandMa?.lastSentPayload,
             uiWebSocketConnections = uiWebSocketConnections,
-            simulatorRunning = simulatorRunning,
             logDirectory = System.getProperty("BEATLINK_LOG_DIR") ?: System.getenv("BEATLINK_LOG_DIR") ?: ".",
             ownDeviceNumber = proDjLinkAdapter.ownDeviceNumber(),
         )

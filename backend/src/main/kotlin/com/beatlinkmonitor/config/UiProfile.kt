@@ -33,7 +33,7 @@ data class PlayerSlotConfig(
 
 /** The default set of global widgets (requirements specification §10.3), all visible by default. */
 val DEFAULT_GLOBAL_WIDGETS: List<WidgetConfig> = listOf(
-    "masterBpm", "masterPlayer", "networkStatus", "prodjlinkStatus", "linkStatus", "grandmaStatus", "simulatorStatus",
+    "masterBpm", "masterPlayer", "networkStatus", "prodjlinkStatus", "linkStatus", "grandmaStatus",
 ).mapIndexed { index, id -> WidgetConfig(id = id, type = id, order = index) }
 
 /**
@@ -71,4 +71,20 @@ data class UiProfile(
     // Display) since "how smooth vs. how precise" is a matter of taste that
     // depends on the specific hardware/network's jitter characteristics.
     val waveformSmoothingFactor: Double = 0.08,
+    // Mixer EQ -> waveform brightness (needs Settings -> Mixer integration and
+    // a mixer sending live knob positions). A band's brightness is
+    // [eqMinBrightness] at the raw value [eqRawMin] (knob fully down, 0 on a
+    // DJM-V10) and 100% at [eqRawCenter] (detent, 128). Above the detent the
+    // band gets up to [eqBoostGlow] extra brightness (a glow added on top,
+    // reached at raw 255); 0 disables the boost.
+    val eqWaveformEnabled: Boolean = true,
+    val eqRawMin: Int = 0,
+    val eqRawCenter: Int = 128,
+    val eqMinBrightness: Double = 0.1,
+    val eqBoostGlow: Double = 0.4,
+    // Which mixer EQ band drives the mid (green / amber) part of the
+    // waveform: AUTO picks Hi-Mid for 3-band mixers (they keep their single
+    // mid knob there and leave Lo-Mid at 0) and the average of Hi-Mid and
+    // Lo-Mid for 4-band mixers; or force one of them.
+    val eqMidSource: String = "AUTO", // AUTO | AVERAGE | HI_MID | LO_MID
 )

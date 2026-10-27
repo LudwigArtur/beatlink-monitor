@@ -23,8 +23,7 @@ data class WaveformResponse(
     // How many milliseconds of track-time a single entry in `heights`/
     // `colors` represents - the authoritative mapping from buffer index to
     // track-time, computed from the *actual* resolution this specific
-    // response was rendered at (always exact, including after any
-    // min/max column-count clamping for simulated tracks). Deliberately
+    // response was rendered at (always exact). Deliberately
     // NOT left for the client to infer from the player's separately
     // reported `trackDurationMs`: that duration comes from Pro DJ Link
     // metadata, which Pioneer only reports rounded to whole seconds, while

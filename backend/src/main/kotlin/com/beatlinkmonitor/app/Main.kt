@@ -13,7 +13,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 private val logger by lazy { KotlinLogging.logger {} }
 
 /**
- * Starts every backend subsystem (Pro DJ Link, simulator, outputs, Web UI
+ * Starts every backend subsystem (Pro DJ Link, outputs, Web UI
  * API/WebSocket) against the given [context]. Shared by both the headless
  * entry point ([main], for server-only/Raspberry-Pi-kiosk use per
  * requirements specification §18.3/§18.4) and the native desktop GUI entry point
@@ -28,8 +28,7 @@ private val logger by lazy { KotlinLogging.logger {} }
  * 4. Pro DJ Link devices are discovered.
  * 5. Players 1-6 are tracked as [com.beatlinkmonitor.model.PlayerState].
  * 6. Changes are logged.
- * 7. The simulator can alternatively feed the very same PlayerState objects.
- * 8. A WebSocket exposes the current state as JSON.
+ * 7. A WebSocket exposes the current state as JSON.
  */
 fun bootstrapBackend(context: AppContext) {
     logger.info { "Beat Link Monitor v$APPLICATION_VERSION starting" }
@@ -41,7 +40,11 @@ fun bootstrapBackend(context: AppContext) {
         Thread {
             logger.info { "Shutting down..." }
             runCatching { context.outputManager.stopAll() }
-            runCatching { context.simulationService.stop() }
+            runCatching { context.packetRecorder.stop() }
+            runCatching { context.peerAnnouncer.stop() }
+            runCatching { context.audioLevels.stop() }
+            runCatching { context.cdjLink.stop() }
+            runCatching { context.mixerLink.stop() }
             runCatching { context.proDjLinkAdapter.stop() }
             runCatching { context.apiServer?.stop(1_000, 2_000) }
         },
@@ -51,8 +54,8 @@ fun bootstrapBackend(context: AppContext) {
     // never prevent the others from running (requirements specification §23, §43). The Pro
     // DJ Link stack is started on its own thread because `beat-link`'s
     // VirtualCdj blocks for up to ~30s retrying device discovery when no
-    // network is present yet - the simulator and the web UI must remain
-    // usable immediately regardless of that (requirements specification §16, §43).
+    // network is present yet - the web UI must remain usable immediately
+    // regardless of that (requirements specification §43).
     Thread({
         val manualInterface = context.applicationConfig
             .takeIf { it.networkInterfaceMode == "MANUAL" }
@@ -67,12 +70,12 @@ fun bootstrapBackend(context: AppContext) {
             .onFailure { logger.error(it) { "Pro DJ Link adapter failed to start" } }
     }, "pro-dj-link-startup").apply { isDaemon = true }.start()
 
-    if (context.applicationConfig.developmentMode || context.applicationConfig.simulatorAutoStart) {
-        runCatching { context.simulationService.start() }
-            .onFailure { logger.error(it) { "Simulator failed to start" } }
-        context.diagnostics.simulatorRunning = true
-        logger.info { "Development mode: simulator auto-started" }
-    }
+    runCatching { context.mixerLink.start() }
+    runCatching { context.cdjLink.start() }
+    runCatching { context.audioLevels.start() }
+        .onFailure { logger.error(it) { "Mixer link failed to start" } }
+    runCatching { context.peerAnnouncer.start() }
+        .onFailure { logger.error(it) { "Peer announcer failed to start" } }
 
     runCatching { context.outputManager.startAll() }
         .onFailure { logger.error(it) { "Output manager failed to start" } }

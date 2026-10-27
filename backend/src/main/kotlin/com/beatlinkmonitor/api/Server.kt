@@ -4,7 +4,9 @@ import com.beatlinkmonitor.app.AppContext
 import com.beatlinkmonitor.config.ApplicationConfig
 import com.beatlinkmonitor.config.OutputsConfig
 import com.beatlinkmonitor.config.UiProfile
-import com.beatlinkmonitor.simulator.SimulatedTrack
+import com.beatlinkmonitor.cdj.CdjProtocol
+import com.beatlinkmonitor.mixer.MixerSnapshot
+import com.beatlinkmonitor.mixer.UtilityWriteRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
@@ -43,7 +45,7 @@ private val logger = KotlinLogging.logger {}
 /**
  * The local Web-UI API (requirements specification §17.4): a WebSocket pushes the current
  * application state as JSON (Phase 4 of §38), while a small REST surface
- * handles configuration and simulator control. Binds to 127.0.0.1 by default;
+ * handles configuration and mixer control. Binds to 127.0.0.1 by default;
  * LAN access must be explicitly enabled (requirements specification §29.1).
  */
 fun startApiServer(context: AppContext): io.ktor.server.engine.ApplicationEngine {
@@ -73,11 +75,16 @@ fun Application.apiModule(context: AppContext) {
             logger.info { "UI WebSocket client connected (${context.diagnostics.uiWebSocketConnections} active)" }
             val json = Json { encodeDefaults = true }
             val pushJob = launch {
-                combine(context.applicationState.players, context.applicationState.masterClock) { players, master ->
+                combine(
+                    context.applicationState.players,
+                    context.applicationState.masterClock,
+                    context.applicationState.mixer,
+                ) { players, master, mixer ->
                     StateSnapshotMessage(
                         players = players.values.sortedBy { it.deviceNumber },
                         masterClock = master,
                         outputs = context.outputManager.statuses(),
+                        mixer = mixer,
                     )
                 }.collect { snapshot ->
                     // Coalesced to ~20 Hz so waveform-adjacent fast fields stay smooth
@@ -101,7 +108,7 @@ fun Application.apiModule(context: AppContext) {
             try {
                 for (frame in incoming) {
                     if (frame is Frame.Text) {
-                        // Currently read-only besides keep-alive pings; simulator/config
+                        // Currently read-only besides keep-alive pings; mixer/config
                         // control goes through the REST endpoints below for easier testing
                         // (e.g. via curl) without a full client implementation.
                         logger.debug { "WS message from client: ${frame.readText()}" }
@@ -123,6 +130,7 @@ fun Application.apiModule(context: AppContext) {
                     players = context.applicationState.players.value.values.sortedBy { it.deviceNumber },
                     masterClock = context.applicationState.masterClock.value,
                     outputs = context.outputManager.statuses(),
+                    mixer = context.applicationState.mixer.value,
                 ),
             )
         }
@@ -134,32 +142,8 @@ fun Application.apiModule(context: AppContext) {
         get("/api/waveform/{device}") {
             val deviceNumber = device(call)
             val player = context.applicationState.players.value[deviceNumber]
-            val sampleTrackId = player?.let { if (it.source == com.beatlinkmonitor.model.PlayerSource.SIMULATED) it.rekordboxTrackId else null }
             val response = when {
                 player == null -> WaveformResponse(deviceNumber, "NONE", available = false, note = "unknown player")
-                com.beatlinkmonitor.waveform.SampleTrackLibrary.isSampleTrack(sampleTrackId) -> {
-                    // A simulated player has loaded one of the bundled sample
-                    // tracks with real, pre-analyzed waveform data - decode it
-                    // via the exact same path real hardware uses (requirements specification
-                    // §16.6, coding guideline #6).
-                    val preview = com.beatlinkmonitor.waveform.SampleTrackLibrary.preview(sampleTrackId!!)
-                    if (preview != null) {
-                        val (heights, colors) = com.beatlinkmonitor.waveform.WaveformPixelDecoder.decodePreview(preview)
-                        WaveformResponse(deviceNumber, player.waveformType.name, available = true, heights = heights, colors = colors)
-                    } else {
-                        WaveformResponse(deviceNumber, player.waveformType.name, available = false, note = "sample waveform not found")
-                    }
-                }
-                player.source == com.beatlinkmonitor.model.PlayerSource.SIMULATED -> {
-                    val seed = player.rekordboxTrackId ?: 0L
-                    WaveformResponse(
-                        deviceNumber = deviceNumber,
-                        type = player.waveformType.name,
-                        available = player.title != null,
-                        heights = com.beatlinkmonitor.waveform.SimulatedWaveformGenerator.generate(seed),
-                        colors = com.beatlinkmonitor.waveform.SimulatedWaveformGenerator.generateColors(seed),
-                    )
-                }
                 else -> {
                     // Real hardware: decode the actual cached `beat-link` waveform
                     // object using its own segmentHeight/segmentColor accessors
@@ -213,29 +197,9 @@ fun Application.apiModule(context: AppContext) {
             val columns = call.request.queryParameters["columns"]?.toIntOrNull() ?: 600
             val player = context.applicationState.players.value[deviceNumber]
             val positionMs = player?.playbackPositionMs
-            val sampleTrackId = player?.let { if (it.source == com.beatlinkmonitor.model.PlayerSource.SIMULATED) it.rekordboxTrackId else null }
             val response = when {
                 player == null -> WaveformResponse(deviceNumber, "NONE", available = false, note = "unknown player")
                 positionMs == null -> WaveformResponse(deviceNumber, player.waveformType.name, available = false, note = "no playback position yet")
-                com.beatlinkmonitor.waveform.SampleTrackLibrary.isSampleTrack(sampleTrackId) -> {
-                    val detail = com.beatlinkmonitor.waveform.SampleTrackLibrary.detail(sampleTrackId!!)
-                    if (detail != null) {
-                        val (heights, colors) = com.beatlinkmonitor.waveform.WaveformPixelDecoder.decodeDetailWindow(
-                            detail, positionMs, beforeMs, afterMs, columns,
-                        )
-                        WaveformResponse(deviceNumber, player.waveformType.name, available = true, heights = heights, colors = colors)
-                    } else {
-                        WaveformResponse(deviceNumber, player.waveformType.name, available = false, note = "sample waveform not found")
-                    }
-                }
-                player.source == com.beatlinkmonitor.model.PlayerSource.SIMULATED -> {
-                    val seed = player.rekordboxTrackId ?: 0L
-                    val durationMs = player.trackDurationMs ?: 0L
-                    val (heights, colors) = com.beatlinkmonitor.waveform.SimulatedWaveformGenerator.generateDetailWindow(
-                        seed, positionMs, durationMs, beforeMs, afterMs, columns,
-                    )
-                    WaveformResponse(deviceNumber, player.waveformType.name, available = true, heights = heights, colors = colors)
-                }
                 else -> {
                     val key = com.beatlinkmonitor.waveform.WaveformCacheKey(
                         (player.rekordboxTrackId ?: 0L).toInt(),
@@ -274,14 +238,7 @@ fun Application.apiModule(context: AppContext) {
         get("/api/waveform/{device}/detail/full") {
             val deviceNumber = device(call)
             val player = context.applicationState.players.value[deviceNumber]
-            val sampleTrackId = player?.let { if (it.source == com.beatlinkmonitor.model.PlayerSource.SIMULATED) it.rekordboxTrackId else null }
             val durationMs = player?.trackDurationMs ?: 0L
-            // Simulated (procedural, non-sample) tracks have no fixed native
-            // resolution to match, so we sample densely at 150 columns/sec -
-            // the same rate real Pro DJ Link detail waveforms use (150
-            // half-frames/sec) - for visual parity and to avoid any
-            // resampling-related flicker once the frontend scrolls through it.
-            val simulatedColumns = ((durationMs / 1000.0) * 150).toInt().coerceIn(200, 100_000)
             // The real Pro DJ Link detail-waveform half-frame rate (see
             // `WaveformResponse.columnIntervalMs`'s doc comment for why this
             // must be used instead of the separately-reported, whole-seconds
@@ -289,29 +246,6 @@ fun Application.apiModule(context: AppContext) {
             val nativeColumnIntervalMs = 100.0 / 15.0
             val response = when {
                 player == null -> WaveformResponse(deviceNumber, "NONE", available = false, note = "unknown player")
-                com.beatlinkmonitor.waveform.SampleTrackLibrary.isSampleTrack(sampleTrackId) -> {
-                    val detail = com.beatlinkmonitor.waveform.SampleTrackLibrary.detail(sampleTrackId!!)
-                    if (detail != null) {
-                        // Full native resolution (one column per half-frame,
-                        // no downsampling) - this is the real, maximum-detail
-                        // Pro DJ Link waveform data, not an approximation.
-                        val (heights, colors) = com.beatlinkmonitor.waveform.WaveformPixelDecoder.decodeDetailFull(detail, detail.frameCount)
-                        WaveformResponse(deviceNumber, player.waveformType.name, available = true, heights = heights, colors = colors, columnIntervalMs = nativeColumnIntervalMs)
-                    } else {
-                        WaveformResponse(deviceNumber, player.waveformType.name, available = false, note = "sample waveform not found")
-                    }
-                }
-                player.source == com.beatlinkmonitor.model.PlayerSource.SIMULATED -> {
-                    val seed = player.rekordboxTrackId ?: 0L
-                    val (heights, colors) = com.beatlinkmonitor.waveform.SimulatedWaveformGenerator.generateDetailFull(seed, simulatedColumns)
-                    // Self-consistent with however `simulatedColumns` was
-                    // actually computed above (including the min/max
-                    // clamping), rather than re-deriving the fixed 150/sec
-                    // rate and risking it disagreeing with a clamped column
-                    // count.
-                    val columnIntervalMs = if (heights.isNotEmpty()) durationMs.toDouble() / heights.size else 0.0
-                    WaveformResponse(deviceNumber, player.waveformType.name, available = player.title != null, heights = heights, colors = colors, columnIntervalMs = columnIntervalMs)
-                }
                 else -> {
                     val key = com.beatlinkmonitor.waveform.WaveformCacheKey(
                         (player.rekordboxTrackId ?: 0L).toInt(),
@@ -338,24 +272,8 @@ fun Application.apiModule(context: AppContext) {
         get("/api/waveform/{device}/beatgrid") {
             val deviceNumber = device(call)
             val player = context.applicationState.players.value[deviceNumber]
-            val sampleTrackId = player?.let { if (it.source == com.beatlinkmonitor.model.PlayerSource.SIMULATED) it.rekordboxTrackId else null }
             val response = when {
                 player == null -> BeatGridResponse(deviceNumber, available = false, note = "unknown player")
-                com.beatlinkmonitor.waveform.SampleTrackLibrary.isSampleTrack(sampleTrackId) -> {
-                    val grid = com.beatlinkmonitor.waveform.SampleTrackLibrary.beatGrid(sampleTrackId!!)
-                    if (grid != null) {
-                        val (times, beats) = com.beatlinkmonitor.waveform.BeatGridDecoder.decode(grid)
-                        BeatGridResponse(deviceNumber, available = true, beatTimesMs = times, beatsWithinBar = beats)
-                    } else {
-                        BeatGridResponse(deviceNumber, available = false, note = "sample beat grid not found")
-                    }
-                }
-                player.source == com.beatlinkmonitor.model.PlayerSource.SIMULATED -> {
-                    val bpm = player.effectiveBpm ?: player.originalBpm ?: 0.0
-                    val durationMs = player.trackDurationMs ?: 0L
-                    val (times, beats) = com.beatlinkmonitor.waveform.SimulatedWaveformGenerator.generateBeatGrid(bpm, durationMs)
-                    BeatGridResponse(deviceNumber, available = player.title != null && times.isNotEmpty(), beatTimesMs = times, beatsWithinBar = beats)
-                }
                 else -> {
                     val key = com.beatlinkmonitor.waveform.WaveformCacheKey(
                         (player.rekordboxTrackId ?: 0L).toInt(),
@@ -402,7 +320,8 @@ fun Application.apiModule(context: AppContext) {
             val needsRestart = previous.networkInterfaceMode != body.networkInterfaceMode ||
                 previous.manualInterfaceName != body.manualInterfaceName ||
                 previous.preferredDeviceNumber != body.preferredDeviceNumber ||
-                previous.waveformStylePreference != body.waveformStylePreference
+                previous.waveformStylePreference != body.waveformStylePreference ||
+                previous.mixerIntegrationEnabled != body.mixerIntegrationEnabled
             if (needsRestart) {
                 logger.info { "Pro DJ Link network/hardware-communication settings changed - a full application restart is required to apply them" }
             }
@@ -455,59 +374,81 @@ fun Application.apiModule(context: AppContext) {
             call.respond(profile)
         }
 
-        // --- Simulator -------------------------------------------------------
-        post("/api/simulator/start") {
-            context.simulationService.start()
-            context.diagnostics.simulatorRunning = true
-            call.respond(HttpStatusCode.OK)
+        // --- Mixer -------------------------------------------------------------
+        get("/api/mixer") {
+            call.respond(MixerSnapshot(context.applicationState.mixer.value, context.mixerLink.status()))
         }
-        post("/api/simulator/stop") {
-            context.simulationService.stop()
-            context.diagnostics.simulatorRunning = false
-            call.respond(HttpStatusCode.OK)
+        get("/api/mixer/levels") { call.respond(context.audioLevels.status()) }
+        post("/api/mixer/utility/read") {
+            call.respond(mapOf("started" to context.mixerLink.requestReadAll()))
         }
-        post("/api/simulator/{device}/connect") {
-            context.simulationService.connect(device(call))
-            call.respond(HttpStatusCode.OK)
+        post("/api/mixer/utility/{id}/read") {
+            val id = call.parameters["id"]?.toIntOrNull()
+            if (id == null) {
+                call.respond(HttpStatusCode.BadRequest)
+            } else {
+                call.respond(mapOf("sent" to context.mixerLink.requestRead(id)))
+            }
         }
-        post("/api/simulator/{device}/disconnect") {
-            context.simulationService.disconnect(device(call))
-            call.respond(HttpStatusCode.OK)
+        post("/api/mixer/utility/{id}") {
+            val id = call.parameters["id"]?.toIntOrNull()
+            if (id == null) {
+                call.respond(HttpStatusCode.BadRequest)
+            } else if (!isTrustedOrigin(call)) {
+                call.respond(HttpStatusCode.Forbidden, "Cross-origin mixer writes are not allowed")
+            } else {
+                val body = call.receive<UtilityWriteRequest>()
+                call.respond(context.mixerLink.writeUtility(id, body.value))
+            }
         }
-        post("/api/simulator/{device}/play") {
-            context.simulationService.setPlaying(device(call), true)
-            call.respond(HttpStatusCode.OK)
+        // --- CDJs: settings, deck flags, remote buttons (see Docs/CDJ_CONTROL.md) ----
+        get("/api/cdj") { call.respond(context.cdjLink.snapshot()) }
+        post("/api/cdj/refresh") {
+            context.cdjLink.requestRefresh()
+            call.respond(HttpStatusCode.Accepted)
         }
-        post("/api/simulator/{device}/pause") {
-            context.simulationService.setPlaying(device(call), false)
-            call.respond(HttpStatusCode.OK)
+        post("/api/cdj/{player}/setting/{offset}") {
+            val player = call.parameters["player"]?.toIntOrNull()
+            val offset = call.parameters["offset"]?.toIntOrNull()
+            if (player == null || offset == null) {
+                call.respond(HttpStatusCode.BadRequest)
+            } else if (!isTrustedOrigin(call)) {
+                call.respond(HttpStatusCode.Forbidden, "Cross-origin CDJ writes are not allowed")
+            } else {
+                val body = call.receive<UtilityWriteRequest>()
+                call.respond(context.cdjLink.writeSetting(player, offset, body.value))
+            }
         }
-        post("/api/simulator/{device}/onair") {
-            val body = call.receive<ClientCommand>()
-            context.simulationService.setOnAir(device(call), body.boolValue ?: true)
-            call.respond(HttpStatusCode.OK)
+        post("/api/cdj/{player}/button/{code}") {
+            val player = call.parameters["player"]?.toIntOrNull()
+            val code = call.parameters["code"]?.toIntOrNull()
+            val press = when (call.request.queryParameters["press"]?.lowercase()) {
+                null, "", "click" -> CdjProtocol.Press.CLICK
+                "down" -> CdjProtocol.Press.DOWN
+                "up" -> CdjProtocol.Press.UP
+                else -> null
+            }
+            if (player == null || code == null || press == null) {
+                call.respond(HttpStatusCode.BadRequest)
+            } else if (!isTrustedOrigin(call)) {
+                call.respond(HttpStatusCode.Forbidden, "Cross-origin CDJ control is not allowed")
+            } else {
+                call.respond(context.cdjLink.pressButton(player, code, press))
+            }
         }
-        post("/api/simulator/{device}/master") {
-            context.simulationService.setMaster(device(call))
-            call.respond(HttpStatusCode.OK)
+        // Diagnostic: record the traffic on the Pro DJ Link status socket into a pcap file (see PacketRecorder).
+        get("/api/mixer/record") { call.respond(context.packetRecorder.status()) }
+        post("/api/mixer/record/start") {
+            if (!isTrustedOrigin(call)) {
+                call.respond(HttpStatusCode.Forbidden)
+            } else if (!context.mixerTransport.available) {
+                call.respond(HttpStatusCode.Conflict, "The Pro DJ Link status socket is not hooked (enable the mixer integration)")
+            } else {
+                context.packetRecorder.start()
+                call.respond(context.packetRecorder.status())
+            }
         }
-        post("/api/simulator/{device}/pitch") {
-            val body = call.receive<ClientCommand>()
-            context.simulationService.setPitch(device(call), body.value ?: 0.0)
-            call.respond(HttpStatusCode.OK)
-        }
-        post("/api/simulator/{device}/seek") {
-            val body = call.receive<ClientCommand>()
-            context.simulationService.seek(device(call), body.positionMs ?: 0L)
-            call.respond(HttpStatusCode.OK)
-        }
-        post("/api/simulator/{device}/load/{trackIndex}") {
-            val track: SimulatedTrack = com.beatlinkmonitor.simulator.SimulationService.DEMO_TRACKS
-                .getOrElse(call.parameters["trackIndex"]!!.toInt()) { com.beatlinkmonitor.simulator.SimulationService.DEMO_TRACKS[0] }
-            context.simulationService.loadTrack(device(call), track)
-            call.respond(HttpStatusCode.OK)
-        }
-        get("/api/simulator/tracks") { call.respond(com.beatlinkmonitor.simulator.SimulationService.DEMO_TRACKS) }
+        post("/api/mixer/record/stop") { call.respond(context.packetRecorder.stop()) }
 
         // --- GrandMA2 test -----------------------------------------------------
         post("/api/outputs/grandma/test") {
@@ -557,3 +498,16 @@ fun Application.apiModule(context: AppContext) {
 }
 
 private fun device(call: ApplicationCall): Int = call.parameters["device"]!!.toInt()
+
+/**
+ * Mixer writes change real hardware settings, so a browser page from another
+ * origin must not be able to trigger them just because the API allows
+ * cross-origin requests: a request with an Origin header is only accepted if
+ * it comes from this server itself or from the Vite dev server.
+ */
+private fun isTrustedOrigin(call: ApplicationCall): Boolean {
+    val origin = call.request.headers["Origin"] ?: return true
+    val originAuthority = origin.substringAfter("://", "")
+    val hostHeader = call.request.headers["Host"]
+    return originAuthority == hostHeader || originAuthority in setOf("localhost:5173", "127.0.0.1:5173")
+}

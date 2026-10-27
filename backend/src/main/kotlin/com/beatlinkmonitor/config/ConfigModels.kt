@@ -31,11 +31,40 @@ data class ApplicationConfig(
     // application restart to take effect, like the other Pro DJ Link
     // network-level settings above.
     val waveformStylePreference: String = "RGB", // RGB | THREE_BAND
+    // Mixer integration (see Docs/MIXER_CONTROL.md), on by default so that all
+    // data of the real hardware is read:
+    // - mixerIntegrationEnabled: listen for the mixer's live knob/fader
+    //   packets (EQ -> waveform brightness), read its utility settings and
+    //   firmware version. Hooks the Pro DJ Link status socket at startup, so
+    //   changing it needs a restart.
+    // - mixerControlEnabled: allow *writing* mixer settings (only ever on an
+    //   explicit request from the UI/API; a write counts as confirmed only
+    //   after the mixer reports the new value back).
+    // - mixerAddress: optional IPv4 override; empty = the mixer found by
+    //   Pro DJ Link discovery.
+    val mixerIntegrationEnabled: Boolean = true,
+    val mixerControlEnabled: Boolean = true,
+    val mixerAddress: String? = null,
+    // Announce this app as an additional third-party participant (category
+    // 5, device number 54-57, like ShowKontrol) next to beat-link's virtual
+    // CDJ. Verified on a real DJM-V10 and CDJ-3000s: without it the mixer
+    // sends no live state and the players no extended status. Adds one more
+    // device to the Pro DJ Link network. Needs the mixer integration.
+    val mixerAnnounceIdentity: Boolean = true,
+    val mixerIdentityName: String = "BEATLINK-MON",
+    // CDJ integration (see Docs/CDJ_CONTROL.md), on by default:
+    // - cdjIntegrationEnabled: read every CDJ's settings and deck flags
+    //   (requests are harmless reads). Needs the mixer integration's socket hook.
+    // - cdjControlEnabled: allow *writing* CDJ settings (explicit request
+    //   only; counts as confirmed after the CDJ reports the new value).
+    // - cdjRemoteEnabled: allow pressing CDJ buttons remotely (play, cue,
+    //   hot cues ...). Off by default because it acts on live playback.
+    val cdjIntegrationEnabled: Boolean = true,
+    val cdjControlEnabled: Boolean = true,
+    val cdjRemoteEnabled: Boolean = false,
     val webUiPort: Int = 17812,
     val allowLanAccess: Boolean = false,
     val bpmDecimalPlaces: Int = 2,
-    val developmentMode: Boolean = false,
-    val simulatorAutoStart: Boolean = false,
     val logLevel: String = "INFO",
     val activeProfile: String = "default",
 )

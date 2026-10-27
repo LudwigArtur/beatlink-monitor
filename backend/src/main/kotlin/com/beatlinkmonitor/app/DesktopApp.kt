@@ -181,7 +181,6 @@ class DesktopApp : Application() {
 
     private fun shutdown() {
         runCatching { context.outputManager.stopAll() }
-        runCatching { context.simulationService.stop() }
         runCatching { context.proDjLinkAdapter.stop() }
         // Must explicitly stop the embedded Netty engine: its worker threads
         // are not daemon threads by default, so without this the JVM process

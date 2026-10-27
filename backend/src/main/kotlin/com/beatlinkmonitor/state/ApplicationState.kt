@@ -1,6 +1,9 @@
 package com.beatlinkmonitor.state
 
 import com.beatlinkmonitor.model.MasterClockState
+import com.beatlinkmonitor.mixer.MixerLiveState
+import com.beatlinkmonitor.mixer.MixerState
+import com.beatlinkmonitor.mixer.UtilityValue
 import com.beatlinkmonitor.model.PlayerState
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -18,10 +21,10 @@ private val logger = KotlinLogging.logger {}
  * The single source of truth of the whole application (requirements specification §20).
  *
  * Neither the UI, nor GrandMA2, nor Ableton Link are ever allowed to query
- * `beat-link` (or the simulator) directly. Everything flows through here:
+ * `beat-link` directly. Everything flows through here:
  *
  * ```
- * beat-link / simulator -> ApplicationState -> UI / outputs
+ * beat-link -> ApplicationState -> UI / outputs
  * ```
  */
 class ApplicationState {
@@ -31,6 +34,9 @@ class ApplicationState {
 
     private val _masterClock = MutableStateFlow(MasterClockState.INVALID)
     val masterClock: StateFlow<MasterClockState> = _masterClock.asStateFlow()
+
+    private val _mixer = MutableStateFlow(MixerState())
+    val mixer: StateFlow<MixerState> = _mixer.asStateFlow()
 
     // Replay = 0 on purpose: events are transient notifications, current state
     // is always available via the StateFlows above for late subscribers.
@@ -131,9 +137,31 @@ class ApplicationState {
         if (beatWithinBar == 1) emit(AppEvent.BarOccurred(deviceNumber))
     }
 
+    fun updateMixerLive(live: MixerLiveState) {
+        _mixer.update { it.copy(live = live, liveTimestampMs = System.currentTimeMillis()) }
+    }
+
+    /** Records a utility reply; a null [value] marks the item as reported-unavailable by the mixer. */
+    fun updateMixerUtility(id: Int, value: Int?) {
+        val entry = UtilityValue(id, value, System.currentTimeMillis())
+        _mixer.update { current ->
+            current.copy(utilities = (current.utilities.filterNot { it.id == id } + entry).sortedBy { it.id })
+        }
+    }
+
+    fun updateMixerVersion(version: String) {
+        _mixer.update { it.copy(version = version) }
+    }
+
+    /** Forgets everything learned from the mixer (e.g. when it stopped sending). */
+    fun clearMixer() {
+        _mixer.value = MixerState()
+    }
+
     fun reset() {
         _players.value = emptyMap()
         _masterClock.value = MasterClockState.INVALID
+        _mixer.value = MixerState()
     }
 
     private fun emit(event: AppEvent) {

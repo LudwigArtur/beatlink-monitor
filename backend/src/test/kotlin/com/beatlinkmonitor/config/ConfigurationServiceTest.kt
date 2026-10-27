@@ -36,13 +36,13 @@ class ConfigurationServiceTest {
     @Test
     fun `application config round-trips through save and load`() {
         val service = newService()
-        val config = ApplicationConfig(webUiPort = 9999, allowLanAccess = true, developmentMode = true)
+        val config = ApplicationConfig(webUiPort = 9999, allowLanAccess = true, mixerControlEnabled = false)
         service.saveApplicationConfig(config)
 
         val reloaded = service.loadApplicationConfig()
         assertEquals(9999, reloaded.webUiPort)
         assertTrue(reloaded.allowLanAccess)
-        assertTrue(reloaded.developmentMode)
+        assertFalse(reloaded.mixerControlEnabled)
     }
 
     @Test

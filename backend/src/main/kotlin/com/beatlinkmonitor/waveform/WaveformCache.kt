@@ -137,9 +137,8 @@ object WaveformPixelDecoder {
     /**
      * Slices a zoomed-in window of [columns] pixels out of a full-track
      * [WaveformDetail], centered around [positionMs] with [beforeMs] shown
-     * before the playhead and [afterMs] after it - the real-hardware
-     * counterpart to [com.beatlinkmonitor.waveform.SimulatedWaveformGenerator.generateDetailWindow],
-     * used for the Live View's scrolling detail row (requirements specification §9.4).
+     * before the playhead and [afterMs] after it, used for the Live View's
+     * scrolling detail row (requirements specification §9.4).
      * Positions outside the track render as silence rather than clamping to
      * the first/last frame, so the waveform doesn't visually "stick".
      */
@@ -196,9 +195,7 @@ object WaveformPixelDecoder {
 
     /**
      * Decodes the **entire** track's detail waveform at a fixed [columns]
-     * resolution, evenly spanning every half-frame from start to end - the
-     * real-hardware/sample-track counterpart to
-     * [SimulatedWaveformGenerator.generateDetailFull]. Meant to be fetched
+     * resolution, evenly spanning every half-frame from start to end. Meant to be fetched
      * once per track load (not on a timer) so the Live View's scrolling
      * detail row never has to race multiple in-flight network responses
      * against each other while a player is actively running.

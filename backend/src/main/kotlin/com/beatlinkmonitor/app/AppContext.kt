@@ -3,9 +3,14 @@ package com.beatlinkmonitor.app
 import com.beatlinkmonitor.config.ApplicationConfig
 import com.beatlinkmonitor.config.ConfigurationService
 import com.beatlinkmonitor.diagnostics.DiagnosticsService
+import com.beatlinkmonitor.cdj.CdjLinkService
+import com.beatlinkmonitor.mixer.AudioLevelService
+import com.beatlinkmonitor.mixer.MixerLinkService
+import com.beatlinkmonitor.mixer.PeerAnnouncer
 import com.beatlinkmonitor.outputs.OutputManager
+import com.beatlinkmonitor.prodjlink.PacketRecorder
 import com.beatlinkmonitor.prodjlink.ProDjLinkAdapter
-import com.beatlinkmonitor.simulator.SimulationService
+import com.beatlinkmonitor.prodjlink.VirtualCdjMixerTransport
 import com.beatlinkmonitor.state.ApplicationState
 import com.beatlinkmonitor.waveform.WaveformCache
 
@@ -25,12 +30,27 @@ class AppContext(
     val waveformCache = WaveformCache()
 
     val proDjLinkAdapter = ProDjLinkAdapter(applicationState, waveformCache)
-    val simulationService = SimulationService(applicationState)
+
+    val packetRecorder = PacketRecorder { java.io.File(configurationService.rootDir, "recordings") }
+    val mixerTransport: VirtualCdjMixerTransport =
+        VirtualCdjMixerTransport({ data, length ->
+            mixerLink.handlePacket(data, length)
+            cdjLink.handlePacket(data, length)
+        }, packetRecorder, { data, length -> audioLevels.handlePacket(data, length) })
+    val peerAnnouncer: PeerAnnouncer = PeerAnnouncer({ applicationConfig }, mixerTransport.announcementTransport)
+    val mixerLink: MixerLinkService = MixerLinkService(
+        applicationState,
+        { applicationConfig },
+        mixerTransport,
+        { mixerTransport.ensureInstalled() },
+        { peerAnnouncer.status() },
+    ).also { mixerTransport.identityOverride = { peerAnnouncer.activeIdentity() } }
+    val audioLevels: AudioLevelService = AudioLevelService(applicationState, { applicationConfig }, mixerTransport.audioTransport)
+    val cdjLink: CdjLinkService = CdjLinkService(applicationState, { applicationConfig }, mixerTransport)
     val outputManager = OutputManager(applicationState, configurationService)
     val diagnostics = DiagnosticsService(
         applicationState,
         proDjLinkAdapter,
-        simulationService,
         outputManager,
         APPLICATION_VERSION,
     )

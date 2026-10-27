@@ -148,7 +148,8 @@ val buildFrontend = tasks.register<Exec>("buildFrontend") {
     outputs.dir(File(frontendDir, "dist"))
 }
 
-val copyFrontend = tasks.register<Copy>("copyFrontend") {
+// Sync (not Copy) so that stale, hashed bundles from earlier frontend builds do not accumulate in the app.
+val copyFrontend = tasks.register<Sync>("copyFrontend") {
     group = "frontend"
     dependsOn(buildFrontend)
     from(File(frontendDir, "dist"))
