@@ -78,8 +78,12 @@ The raw value scale was verified on a real DJM-V10 (0 = knob fully down, detent 
 `0x80`, 255 = fully up). The Mixer tab shows the raw values; Settings → Mixer lets you set
 the raw values for "knob fully down" (default 0) and "knob at center" (default
 128). The mid band follows Hi-Mid on 3-band mixers (they keep their single mid
-knob there and leave Lo-Mid at 0 on all channels; detected automatically) and
-the average of Hi-Mid and Lo-Mid on 4-band mixers; this can be forced.
+knob there and leave Lo-Mid at 0 on all channels) and the average of Hi-Mid and Lo-Mid
+on 4-band mixers; this can be forced in the settings. Which of the two applies is decided
+by the model the mixer announces (`MixerModels`: **DJM-A9 = 3-band, DJM-V10 / V10-LF = 4-band**);
+the Mixer tab shows the detected model and rule. Only for a model that is not in that list
+(not checked on real hardware) the data decides: Lo-Mid at 0 on every channel while some
+Hi-Mid is not. To add a model, extend `MixerModels` after checking it on the device.
 
 ## Audio levels
 
