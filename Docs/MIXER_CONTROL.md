@@ -3,24 +3,41 @@
 BeatLink Monitor can read a Pioneer DJ mixer's live EQ knob positions, let them
 dim the matching parts of a player's waveform, and read/write the mixer's
 "utility" settings. The protocol was first reconstructed by static analysis of
-another application and has since been **checked against one real rig (DJM-V10
-firmware 1.30, four CDJ-3000 firmware 3.22; one session on 2026-10-27)**:
-receiving the live state, the version request and reading all 15 utility
-settings work. Writing a setting was tried once with an unchanged value (the mixer
-answered and confirmed); a real change has not been verified yet.
-The integration is **on by default**, so all data of the real hardware is read; writes
-only happen on an explicit request.
+another application and has since been **checked against two real mixers, in one
+session each on 2026-10-27**: a **DJM-V10 (firmware 1.30)** and a **DJM-A9 (firmware 1.04)**, both
+with four CDJ-3000 (firmware 3.22). Live state, version request, all 15 utility settings, audio
+levels and a real utility write with read-back (item 12, 0 → 1 → 0) work on both. Other models and
+firmware versions may differ. The integration is **on by default**, so all data of the real
+hardware is read; writes only happen on an explicit request.
+
+## Verified models
+
+| | DJM-V10 | DJM-A9 |
+| --- | --- | --- |
+| Firmware (version request) | 1.30 | 1.04 |
+| Announced name, keep-alive category | `DJM-V10`, 3 | `DJM-A9`, 3 |
+| Channels in `0x39` / `0x58` | 6 | 4 (channels 5 and 6 all zero; `0x58` groups 6 and 7 empty) |
+| EQ | 4-band: Hi, Hi-Mid, Lo-Mid, Low | 3-band: Lo-Mid always 0, the single mid knob is Hi-Mid (detected automatically) |
+| EQ scale | 0 = kill, 128 = detent, 255 = max | same |
+| Crossfader (`0x90`) | rest about 129-138 | 0 (left) to 255, 127 at the center |
+| Send / isolator | present | not present (bytes stay 0) |
+| Utility items | 13 and 14 answer "unavailable" | all 15 answer (13 = 0, 14 = 1 at the time); the labels in this app come from another application and are only verified for item 12 |
+| `0x39` / `0x58` layout | 248 / 512 bytes | identical layout and offsets |
+| Needs the third-party identity | yes | tested with it only |
+
+The A9 byte `0x92` of the payload is 1 and shows 0 or 2 only for a moment while the crossfader passes its
+center (127); its meaning is not understood.
 
 ## What works today
 
 | Feature | Verified with |
 | --- | --- |
-| Packet building/parsing (`mixer/MixerProtocol.kt`) | Unit tests, real DJM-V10 |
-| Receiving the live state (`0x39`) | **Real DJM-V10**, but only with the third-party identity below |
+| Packet building/parsing (`mixer/MixerProtocol.kt`) | Unit tests, real DJM-V10 and DJM-A9 |
+| Receiving the live state (`0x39`) | **Real DJM-V10 and DJM-A9**; the V10 only with the third-party identity below |
 | EQ → waveform brightness | **Real DJM-V10 + CDJ-3000** (EQ of channel N dims player N); calibration 0 = down, 128 = center, 255 = full confirmed |
-| Firmware version request (`0x30`/`0x31`) | **Real DJM-V10** (`1.30`) |
-| Utility read (`0x3a`/`0x3b`, obfuscated id accepted) | **Real DJM-V10**: items 0-12 valid, 13 and 14 answered "unavailable" |
-| Utility write with read-back confirmation | Fake transport in tests; **real DJM-V10 once, with an unchanged value** (acknowledged within 3 ms, no change possible to observe) |
+| Firmware version request (`0x30`/`0x31`) | **Real DJM-V10** (`1.30`), **DJM-A9** (`1.04`) |
+| Utility read (`0x3a`/`0x3b`, obfuscated id accepted) | **Real DJM-V10** (items 0-12 valid, 13 and 14 "unavailable") and **DJM-A9** (all 15 answered) |
+| Utility write with read-back confirmation | Fake transport in tests; **real DJM-V10 and DJM-A9**: item 12 written 0 → 1 → 0 and confirmed by read-back |
 
 ## Settings
 

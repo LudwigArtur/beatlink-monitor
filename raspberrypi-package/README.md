@@ -130,7 +130,7 @@ deck flags (CDJs tab). This is **on by default** and includes announcing the app
 extra third-party device (number 54-57) on the Pro DJ Link network, which the mixer needs
 before it sends its live state. Changing mixer or CDJ settings only happens on an explicit
 request and is confirmed by read-back; remote CDJ buttons need a PIN from a file you create on the Pi (`remote-pin.txt` in the data directory, see Docs/CDJ_CONTROL.md). Restart after
-changing these options. Checked on one rig (DJM-V10, CDJ-3000); see
+changing these options. Checked with a DJM-V10 and a DJM-A9 and four CDJ-3000; see
 [Docs/MIXER_CONTROL.md](../Docs/MIXER_CONTROL.md) and
 [Docs/CDJ_CONTROL.md](../Docs/CDJ_CONTROL.md) in the source repository.
 

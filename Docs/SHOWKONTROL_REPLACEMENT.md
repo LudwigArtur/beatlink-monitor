@@ -23,10 +23,10 @@ a proposed order of work. It is a planning document, not a promise.
 | --- | --- | --- |
 | Players: status, BPM, master, on-air, beats, position | yes | yes (beat-link) |
 | Track metadata, beat grid, waveforms (blue / RGB / 3-band), cues | yes | yes (beat-link); phrase analysis (PSSI) not used |
-| Mixer live state (faders, EQ, FX, crossfader) | yes (`0x39`) | works on a real DJM-V10 (one rig) with the experimental third-party identity, see [MIXER_CONTROL.md](MIXER_CONTROL.md) |
-| Mixer utility settings read/write | yes (`0x3a`/`0x3b`) | read and write (read-back confirmed) verified on a real DJM-V10, see [MIXER_CONTROL.md](MIXER_CONTROL.md); on by default |
+| Mixer live state (faders, EQ, FX, crossfader) | yes (`0x39`) | works on a real DJM-V10 and DJM-A9 with the third-party identity, see [MIXER_CONTROL.md](MIXER_CONTROL.md) |
+| Mixer utility settings read/write | yes (`0x3a`/`0x3b`) | read and write (read-back confirmed) verified on a real DJM-V10 and DJM-A9, see [MIXER_CONTROL.md](MIXER_CONTROL.md); on by default |
 | Mixer firmware version | yes (`0x30`/`0x31`) | yes (probe while the integration is on) |
-| Mixer audio levels | yes (`0x57`/`0x58`) | works on a real DJM-V10 (streams unasked, 512-byte frames), meters in the Mixer tab |
+| Mixer audio levels | yes (`0x57`/`0x58`) | works on a real DJM-V10 and DJM-A9 (streams unasked, 512-byte frames), meters in the Mixer tab |
 | CDJ settings read (42 items) / write | yes (`0x6b`/`0x6c`, UDP 50002) | read and write verified on CDJ-3000s, see [CDJ_CONTROL.md](CDJ_CONTROL.md) |
 | CDJ deck state (BPM, pitch, sync, key sync, slip, quantize, ...) | yes (`0x68`/`0x69`) | yes, all offsets but one identified on CDJ-3000s |
 | Remote buttons (play, cue, hot cues, loops, beat jump) | yes (`0x07`, UDP 50001) | yes, behind a server-side PIN per connection; slip tried on a CDJ-3000 |
@@ -58,9 +58,9 @@ a proposed order of work. It is a planning document, not a promise.
 
 ## Proposed order
 
-1. ~~Verify the existing mixer path on the real DJM-V10~~ Done for reading (one rig): live
-   state, version and utility reads work; **still open:** utility writes (needs a deliberate,
-   muted-PA test), other channels/models, the unnamed `0x39` bytes.
+1. ~~Verify the existing mixer path on real mixers~~ Done on a DJM-V10 and a DJM-A9: live state, version, utility
+   reads and a utility write, audio levels. **Still open:** other mixer models, the unnamed `0x39` bytes
+   (payload `0x92`, `0xb4`, `0xb5`, `0xc2`, `0xc3`).
 2. ~~Read-only extras~~ Done: CDJ settings, deck state and mixer audio levels. The CDJ's second
    status form (`0x124`) still arrives and is only filtered.
 3. **Outputs:** pick the ones actually needed from ShowKontrol's list (OSC and MIDI
