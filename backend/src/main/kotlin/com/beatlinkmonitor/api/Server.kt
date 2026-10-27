@@ -8,6 +8,7 @@ import com.beatlinkmonitor.cdj.CdjProtocol
 import com.beatlinkmonitor.cdj.RemoteUnlockStatus
 import com.beatlinkmonitor.mixer.MixerSnapshot
 import com.beatlinkmonitor.mixer.UtilityWriteRequest
+import com.beatlinkmonitor.mixer.withModel
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
@@ -90,7 +91,7 @@ fun Application.apiModule(context: AppContext) {
                         players = players.values.sortedBy { it.deviceNumber },
                         masterClock = master,
                         outputs = context.outputManager.statuses(),
-                        mixer = mixer,
+                        mixer = mixer.withModel(players.values),
                     )
                 }.collect { snapshot ->
                     // Coalesced to ~20 Hz so waveform-adjacent fast fields stay smooth
@@ -137,7 +138,7 @@ fun Application.apiModule(context: AppContext) {
                     players = context.applicationState.players.value.values.sortedBy { it.deviceNumber },
                     masterClock = context.applicationState.masterClock.value,
                     outputs = context.outputManager.statuses(),
-                    mixer = context.applicationState.mixer.value,
+                    mixer = context.applicationState.mixer.value.withModel(context.applicationState.players.value.values),
                 ),
             )
         }
@@ -383,7 +384,7 @@ fun Application.apiModule(context: AppContext) {
 
         // --- Mixer -------------------------------------------------------------
         get("/api/mixer") {
-            call.respond(MixerSnapshot(context.applicationState.mixer.value, context.mixerLink.status()))
+            call.respond(MixerSnapshot(context.applicationState.mixer.value.withModel(context.applicationState.players.value.values), context.mixerLink.status()))
         }
         get("/api/mixer/levels") { call.respond(context.audioLevels.status()) }
         post("/api/mixer/utility/read") {

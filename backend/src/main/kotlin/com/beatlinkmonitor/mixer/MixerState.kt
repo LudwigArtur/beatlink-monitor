@@ -22,6 +22,10 @@ data class MixerState(
     val utilities: List<UtilityValue> = emptyList(),
     /** Firmware version string from the mixer's answer to a version request, if it answered. */
     val version: String? = null,
+    /** Name the mixer announces (e.g. "DJM-A9"); filled in when the state is published, see [withModel]. */
+    val model: String? = null,
+    /** 3 or 4 for models checked on real hardware, null if the model is unknown. */
+    val eqBands: Int? = null,
 )
 
 @Serializable
