@@ -34,8 +34,8 @@ npm ci
 npm run dev
 ```
 
-The simulator is not enabled automatically. Do not use production configuration
-for uncontrolled development tests.
+Do not use production configuration for uncontrolled development tests. There is no
+simulator: the application only shows data of real devices on the Pro DJ Link network.
 
 ## Validation
 

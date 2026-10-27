@@ -6,12 +6,12 @@ This document maps the implementation to
 ## Data flow (requirements specification §17.1, §20)
 
 ```
-Pro DJ Link network            Simulator
-        │                          │
-        ▼                          ▼
-  ProDjLinkAdapter ──────────────────┐
-        │                            │
-        └──────────► ApplicationState ◄──────────┘
+Pro DJ Link network
+        │
+        ▼
+  ProDjLinkAdapter
+        │
+        └──────────► ApplicationState
                      (StateFlow + event bus)
                             │
         ┌───────────┬───────┴───────┬───────────────┐
@@ -24,18 +24,18 @@ Pro DJ Link network            Simulator
 
 `ApplicationState` (`backend/.../state/ApplicationState.kt`) is the single
 source of truth. Neither the UI, nor GrandMA2, nor Ableton Link ever query
-`beat-link` or the simulator directly (coding guideline #1-#6) - both
-sources feed the exact same `upsertPlayer`/`removePlayer`/`beatOccurred` API.
+`beat-link` directly (coding guideline #1-#6); `ProDjLinkAdapter` feeds the
+`upsertPlayer`/`removePlayer`/`beatOccurred` API.
 
 ## Backend modules (`backend/src/main/kotlin/com/beatlinkmonitor/...`)
 
 | Package | Responsibility |
 |---|---|
 | `model` | `PlayerState`, `MasterClockState`, `BpmMath` (high-precision BPM, §7/§8) |
-| `prodjlink` | `ProDjLinkAdapter` - the only place touching `beat-link` directly; `NetworkInterfaceService` (§28) |
+| `prodjlink` | `ProDjLinkAdapter` - the only place touching `beat-link` directly; `NetworkInterfaceService` (§28); `VirtualCdjMixerTransport` (opt-in hook on beat-link's status socket for mixer packets) |
+| `mixer` | Experimental mixer integration ([docs](Docs/MIXER_CONTROL.md)): `MixerProtocol` (packet codecs), `MixerLinkService` (receive, utility read/write with read-back), `PeerAnnouncer` (third-party identity) |
 | `state` | `ApplicationState` (source of truth + event bus, §20/§21), `PlayerSlotResolver` (§5) |
-| `waveform` | `WaveformCache` (§31), fallback chain (§9.3), simulator waveform generator |
-| `simulator` | `SimulationService` - virtual players feeding the identical `ApplicationState` API (§16) |
+| `waveform` | `WaveformCache` (§31), fallback chain (§9.3), pixel decoding of real waveforms |
 | `outputs` | `OutputModule` interface (§14), `RateLimiter` (§13.5), `OutputManager` |
 | `outputs.grandma` | `GrandMaTelnetOutput`, `CommandTemplateEngine` (§13) |
 | `outputs.ableton` | `AbletonLinkOutput`, `CarabinerClient` (§12) |
@@ -54,7 +54,7 @@ sources feed the exact same `upsertPlayer`/`removePlayer`/`beatOccurred` API.
   Carabiner process can never block Pro DJ Link processing or the UI.
 - The Pro DJ Link stack (`VirtualCdj` et al.) is started on its own thread
   from `Main.kt` because `beat-link` blocks for up to ~30s retrying device
-  discovery when no network is present yet; the simulator and web UI must
+  discovery when no network is present yet; the web UI must
   stay usable immediately regardless (§23, §43).
 - The Ktor server pushes state to WebSocket clients via a `combine()` of the
   players/master `StateFlow`s, decoupled from both the network and output
@@ -138,16 +138,7 @@ and unit-tested. 3-Band waveform data is not yet fetched from `beat-link`
 correctly falls back to RGB/Classic per the chain above rather
 than inventing pixel data (coding guideline #13).
 
-`SimulatedWaveformGenerator` renders proper 3-band RGB color data (bass =
-blue, mids = green, highs = red/white - the same visual convention as
-Pioneer's real NXS2 color waveforms and `beat-link-trigger`'s own test mode)
-by sampling a single continuous, deterministic function of track-position,
-rather than a flat single-color bar. Both the full-track overview
-(`generate`/`generateColors`) and the zoomed-in scrolling "detail" window
-(`generateDetailWindow`, used by the Live View below) sample from the exact
-same function, so they are visually consistent for a given track/seed.
-`WaveformPixelDecoder.decodeDetailWindow` is the real-hardware counterpart,
-slicing a `WaveformDetail`'s half-frames (`Util.timeToHalfFrame`, 150/s) into
+`WaveformPixelDecoder.decodeDetailWindow` slices a `WaveformDetail`'s half-frames (`Util.timeToHalfFrame`, 150/s) into
 the same kind of time-windowed view.
 
 ### Live View (§9.4, dedicated fullscreen view)
@@ -175,29 +166,17 @@ clamping/repeating.
 | Path | Responsibility |
 |---|---|
 | `websocket/connection.ts` | WebSocket client + Svelte stores (players, masterClock, outputs, diagnostics), auto-reconnect |
-| `stores/api.ts` | REST client for config/profiles/simulator/outputs/waveforms |
+| `stores/api.ts` | REST client for config/profiles/mixer/outputs/waveforms |
 | `stores/slotResolver.ts` | Client-side mirror of `PlayerSlotResolver` (§5) |
 | `stores/layout.ts` | Active-profile store: switching, saving, drag-reorder, resize, scale/fullscreen/waveform/color setters (§10.4, §11) |
 | `stores/profileDefaults.ts` | Default widget/slot/profile factories matching the backend defaults |
-| `components/GlobalBar.svelte` | Master BPM/Player, network/Link/GrandMA2/simulator status; widget visibility + order driven by the active profile (§10.3, §10.4) |
+| `components/GlobalBar.svelte` | Master BPM/Player, network/Link/GrandMA2 status; widget visibility + order driven by the active profile (§10.3, §10.4) |
 | `components/PlayerGrid.svelte` | Widget-based, slot-driven player layout incl. drag-to-reorder (§10.1/§10.2/§10.4) |
 | `components/LiveView.svelte`, `components/LiveDetailWaveform.svelte` | Dedicated fullscreen Live View with scrolling detail waveforms (§9.4) |
 | `widgets/PlayerCard.svelte`, `widgets/WaveformView.svelte` | Per-player widgets incl. waveform + playback cursor + mouse resize handle (§9.4, §10.4) |
-| `simulator/SimulatorPanel.svelte` | Full simulator controls (§16.4) |
+| `components/MixerPanel.svelte` | Live mixer state, utility settings read/write |
 | `settings/SettingsPanel.svelte` | General/Network/GrandMA2/Ableton Link/Layout/Profiles (§33) |
 | `diagnostics/DiagnosticsView.svelte` | Diagnostics view (§25) |
-
-> **Real bug found and fixed during manual verification:** `SimulatorPanel`
-> computed each row's player via a plain function (`playerFor(device)`)
-> called from inside `{#each}`/`{@const}`. Svelte 5's legacy-mode dependency
-> tracking does not reliably re-invoke such a function on every prop update
-> in this pattern, so newly-connected players, track loads, play/pause, and
-> pitch changes only appeared once *something else* forced a re-render (e.g.
-> switching to another tab and back) - exactly the symptom reported. Fixed
-> the same way as the earlier `GlobalBar` widget-visibility bug: a top-level
-> `$: playersByDevice = new Map(...)` reactive statement, read via simple
-> `.get()` calls in the template, which Svelte's compiler *does* reliably
-> track as a dependency of the `players` prop.
 
 ### Layout / display switching (§10.4, §11)
 
@@ -240,7 +219,7 @@ the frontend in a **separate default-browser tab**:
 DesktopApp (JavaFX)
     │
     ├─ init(): builds AppContext, calls bootstrapBackend() in-process
-    │           (Pro DJ Link, simulator, outputs, Ktor server - all on
+    │           (Pro DJ Link, outputs, Ktor server - all on
     │            their own threads/coroutines as before, §19)
     │
     └─ start(): shows the native control window; waits for /health,
@@ -262,7 +241,7 @@ DesktopApp (JavaFX)
   process. JavaFX WebView is deliberately not used because its macOS rendering
   caused scrolling-waveform flicker in earlier versions.
 - Window close / app quit triggers the same graceful shutdown sequence
-  (`outputManager.stopAll()`, `simulationService.stop()`,
+  (`outputManager.stopAll()`,
   `proDjLinkAdapter.stop()`, stopping Ktor) as the headless shutdown hook.
   Closing only the browser tab does not stop the backend. Quitting the native
   control window does not close the browser tab.

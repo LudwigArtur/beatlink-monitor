@@ -16,7 +16,7 @@ Ableton Link and a grandMA2 console over Telnet. Implemented against
 ## Foundation, attribution and license
 
 **Beat Link Trigger by Deep Symmetry is the conceptual and technical foundation
-of this project.** Its sample waveform/beat-grid data is reused by the simulator.
+of this project.**
 The Kotlin backend directly uses Deep Symmetry's **Beat Link** library; this is
 an independent application, not an official Beat Link Trigger release.
 
@@ -36,9 +36,11 @@ is claimed. Their names are used to describe compatibility.
 
 | Document | Contents |
 | --- | --- |
-| [Quick start](Docs/QUICKSTART.md) | Installation and first simulator run |
+| [Quick start](Docs/QUICKSTART.md) | Installation and first run |
 | [User guide](Docs/USER_GUIDE.md) | Monitor, Live View, outputs and profiles |
 | [Configuration](Docs/CONFIGURATION.md) | Files, network settings and credentials |
+| [Mixer integration](Docs/MIXER_CONTROL.md) | Experimental: mixer EQ → waveform brightness, utility settings |
+| [Towards replacing ShowKontrol](Docs/SHOWKONTROL_REPLACEMENT.md) | What is known, what exists, proposed order |
 | [Troubleshooting](Docs/TROUBLESHOOTING.md) | Build, network, kiosk and output problems |
 | [Development and releases](Docs/DEVELOPMENT.md) | Builds, checks and release checklist |
 | [Raspberry Pi](raspberrypi-package/README.md) | Kiosk installation and removal |
@@ -67,8 +69,8 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design.
 
 - JDK 21 (backend; a JRE alone is insufficient for building)
 - Node.js 20.19+ on the 20.x line, or 22.12+ (frontend; Node 24 recommended)
-- A Pro DJ Link network, *or* nothing at all - the built-in simulator lets
-  you run and test everything without any CDJs/mixer attached.
+- A Pro DJ Link network with CDJs and/or a DJM mixer. The application only shows
+  data of real hardware; it does not simulate devices.
 - Optional: [Carabiner](https://github.com/Deep-Symmetry/carabiner) running
   locally, for the Ableton Link output.
 
@@ -112,7 +114,7 @@ BeatLinkMonitor.app created at: /var/folders/.../beatlinkmonitor-jpackage/BeatLi
 Double-click `BeatLinkMonitor.app` (e.g. in `~/Applications`), exactly like
 any other Mac application. It will:
 
-1. Start the backend (Pro DJ Link discovery, simulator, outputs, Web UI API) in-process.
+1. Start the backend (Pro DJ Link discovery, mixer integration, outputs, Web UI API) in-process.
 2. Show a native control window with the local URL, **Open in Browser** and **Quit**.
 3. Open the full web UI in your default browser once the embedded server is ready.
 4. Stop the backend when you close the control window or quit the app.
@@ -166,19 +168,6 @@ cd frontend && npm run build   # outputs to frontend/dist
 (`./gradlew jpackageMac`/`fatJar`/`fatJarHeadless` all do this automatically
 as part of the backend build - you only need this directly for frontend-only
 work with `npm run dev`.)
-
-## Testing without any hardware
-
-1. Start the application and use the **Start Simulator** control, or enable
-   **Auto-Start Simulator** in **Settings** and restart.
-   Simulator auto-start is disabled by default; see
-   `config/application.example.json`.
-2. Go to the **Simulator** tab.
-3. Connect one or more virtual players, load a demo track, press **Play**,
-   and use **Master** to test tempo-master hand-over between players.
-4. Watch the **Monitor** tab for live player cards / waveforms / master BPM,
-   the **Live View** tab for a dedicated fullscreen multi-track display with
-   scrolling detail waveforms, and **Diagnostics** for overall system health.
 
 ## Configuration
 

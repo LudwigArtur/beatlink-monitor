@@ -2,8 +2,7 @@
 
 ## 1. Safe first use
 
-Read the [warnings](../DISCLAIMER.md). Start with the simulator and disabled
-outputs. The application monitors up to six players; supported features depend
+Read the [warnings](../DISCLAIMER.md). Start with disabled outputs. The application monitors up to six players; supported features depend
 on the model, firmware, network and available analysis information.
 
 ## 2. Monitor and Live View
@@ -33,15 +32,26 @@ Not all data is available without analysis information.
 RGB is the default preference; Three-Band requires compatible hardware.
 A format preference does not guarantee that a device can provide it.
 
-## 4. Simulator
+## 4. Mixer
 
-Click **Start Simulator** in **Simulator**; alternatively save Auto-Start in Settings and
-restart. Connect players, load a demo track and try Play/Pause and master
-changes. Two sample tracks include reused analysis data, but no audio.
-Other simulated waveforms can be generated procedurally.
-Simulation does not validate real network behavior or actual console commands.
+The **Mixer** tab shows the live state of a DJM mixer (EQ, faders, crossfader, FX), its firmware
+version and its utility settings (balance, limiters, output attenuation, mic routing ...). The
+channel EQ also dims the matching part of the waveform of the player on the same channel number.
+Reading needs the mixer integration and the third-party identity (both on by default, see
+**Settings / Mixer** and [MIXER_CONTROL.md](MIXER_CONTROL.md)). A setting is only changed when you
+press **Write** and counts as confirmed only after the mixer reports the new value back.
+Anyone who can reach the web interface can change mixer settings, so keep **Allow LAN Access** off
+on untrusted networks.
 
-## 5. grandMA2 / MA Telnet
+## 5. CDJs
+
+The CDJs tab shows, per player, the 42 CDJ settings and the deck flags (master tempo, vinyl mode, auto cue,
+quantize ...) as the CDJ reports them. "Write" changes one setting and only reports success after the CDJ
+confirmed the new value. Remote buttons (play, cue, hot cues, loops, beat jumps) are off by default and appear
+only after you enable "Allow remote CDJ buttons" in Settings; they act on live playback immediately. See
+[CDJ control](CDJ_CONTROL.md).
+
+## 6. grandMA2 / MA Telnet
 
 Fresh installations have this output disabled and no credentials configured.
 Saved settings from existing installations are preserved.
@@ -57,7 +67,7 @@ The default `SpecialMaster 3.1 At {BPM}` is only a template, not a universally
 correct show configuration. **MA Telnet** provides console-specific
 configuration and interaction. Telnet is unencrypted.
 
-## 6. Ableton Link
+## 7. Ableton Link
 
 Install and start Carabiner separately; it is not part of this package.
 The default target is `127.0.0.1:17000`. Configure the output in Settings,
@@ -65,7 +75,7 @@ choose a quantum and position source, and enable it only after testing.
 Check that the intended Link peers are participating on the correct network.
 A tempo bridge does not provide guaranteed audio/timecode synchronization.
 
-## 7. Saving, stopping and updating
+## 8. Saving, stopping and updating
 
 Configuration is stored in the user profile, not in the source directory.
 Back up configuration and profiles before updates; these may contain passwords.

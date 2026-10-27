@@ -653,6 +653,10 @@ These features are explicitly not required for version 1.
 
 # 16. Simulation Mode
 
+> **Removed (2026-10-27):** the application no longer simulates players or a mixer; it only shows
+> data of real devices. This section and every other requirement that mentions simulation mode
+> is kept for history and no longer applies.
+
 Simulation mode is a required component.
 
 The application must be fully testable without real DJ hardware.

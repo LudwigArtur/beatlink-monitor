@@ -8,7 +8,6 @@ assertion that every dependency has the same license. Retain upstream notices.
 | Material | Origin / version | License and modifications |
 | --- | --- | --- |
 | Beat Link library | Deep Symmetry, LLC, 8.0.0 / local 8.0.0-blm1 | EPL-2.0 per the release's LICENSE.md; one TimeFinder null guard added |
-| Simulator waveform bytes and beat grids | Beat Link Trigger, Deep Symmetry, LLC | EPL-2.0 project material; waveform bytes unchanged, beat grids converted to CSV |
 | Gradle Wrapper | Gradle 8.10.2 | Apache-2.0; wrapper JAR and scripts |
 
 ### Beat Link source and patch
@@ -24,20 +23,6 @@ The actual tagged source distribution's
 and README identify **EPL-2.0**. The original POM is retained rather than
 silently rewriting third-party metadata. EPL-2.0 is included in
 [licenses/EPL-2.0.txt](licenses/EPL-2.0.txt).
-
-### Beat Link Trigger simulator data
-
-Foundation: https://github.com/Deep-Symmetry/beat-link-trigger
-
-Reference revision verified at publication preparation:
-`162695396b152da018bb7d5f25b7760d5a743d7b`.
-Source directory: `resources/beat_link_trigger/sampleTracks/{1,2}/`.
-Included subset: `preview-color.data`, `detail-color.data` and beat timestamps
-/ bar positions converted from `beat-grid.edn` to `beatgrid.csv`.
-Track names: "Concrete Angel (Original Mix)" (Gareth Emery) and
-"Transcendence" (Lindsey Stirling). No recordings or cover artwork are included.
-The project does not claim rights in these recordings or broader music rights.
-See [the data-specific notice](backend/src/main/resources/sampletracks/README.md).
 
 The local `beat-link-trigger-main/` reference checkout is not needed to build
 this application and is not part of the published repository.

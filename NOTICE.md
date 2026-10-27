@@ -19,9 +19,8 @@ The complete terms are in [LICENSE](LICENSE).
 This does not relicense third-party components, claim authorship of upstream
 work, or grant rights in music recordings or trademarks.
 
-The simulator includes waveform analysis bytes and converted beat grids from
-Beat Link Trigger, not audio or album art. Specific sources and modifications
-are documented in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Specific third-party sources and modifications are documented in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 AI generation is disclosed in [AI_DISCLOSURE.md](AI_DISCLOSURE.md).
 Operational warnings are in [DISCLAIMER.md](DISCLAIMER.md). No affiliation,

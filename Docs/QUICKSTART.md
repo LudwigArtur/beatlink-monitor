@@ -40,12 +40,10 @@ On Windows, use `gradlew.bat` instead of `./gradlew`.
 Then open `http://127.0.0.1:17812/` in a browser.
 The web interface is included in the JAR; no separate frontend server is needed.
 
-1. Click **Start Simulator** in **Simulator**; alternatively enable **Auto-Start Simulator**
-   in **Settings**, save and restart.
-2. Connect virtual players in **Simulator**, load a track, press Play and
-   select a master.
-3. Check the display in **Monitor** and **Live View**.
-4. Leave outputs disabled initially. Configure and enable them deliberately
+1. Make sure the computer is on the Pro DJ Link network (select the right adapter in
+   **Settings / Network**). Players and a DJM mixer appear in **Monitor** within seconds.
+2. Check the display in **Monitor**, **Live View** and **Mixer**.
+3. Leave outputs disabled initially. Configure and enable them deliberately
    only after testing.
 
 ## macOS desktop app

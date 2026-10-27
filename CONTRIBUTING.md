@@ -6,8 +6,7 @@ Read the [architecture](ARCHITECTURE.md), [development guide](Docs/DEVELOPMENT.m
 ## Issues
 
 Describe the expected and actual behavior, version/commit, OS, Java/Node
-version, player model/firmware and reproduction steps. Reproduce with the
-simulator where possible. Never upload passwords, complete private
+version, player model/firmware and reproduction steps. Never upload passwords, complete private
 configuration, music files, private network captures or unsanitized logs.
 
 For a suspected security problem, follow [SECURITY.md](SECURITY.md) rather than

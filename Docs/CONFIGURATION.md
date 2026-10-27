@@ -22,10 +22,16 @@ configuration.
 | `manualInterfaceName` | Local adapter name; not a portable default |
 | `preferredDeviceNumber` | 0 for automatic assignment; otherwise deliberately choose a free number |
 | `waveformStylePreference` | `RGB` or `THREE_BAND`; hardware-dependent |
+| `mixerIntegrationEnabled` | true; hooks the Pro DJ Link socket for mixer packets, restart required (see [Mixer integration](MIXER_CONTROL.md)) |
+| `mixerControlEnabled` | true; allows writing mixer settings (only on an explicit request in the Mixer tab/API) |
+| `mixerAddress` | Optional IPv4 address of the mixer; empty = use discovery |
+| `mixerAnnounceIdentity` | true; third-party identity (category 5, device number 54-57) so that mixers may send their live state, see [Mixer integration](MIXER_CONTROL.md) |
+| `mixerIdentityName` | Device name of that identity (ASCII, max 20), default `BEATLINK-MON` |
+| `cdjIntegrationEnabled` | true; reads every CDJ's settings and deck flags, restart required (see [CDJ control](CDJ_CONTROL.md)) |
+| `cdjControlEnabled` | true; allows writing CDJ settings (explicit request in the CDJs tab/API, confirmed by read-back) |
+| `cdjRemoteEnabled` | false; allows pressing CDJ buttons remotely (play, cue, hot cues ...); acts on live playback |
 | `webUiPort` | 17812 |
 | `allowLanAccess` | false: loopback only; true: all IPv4 interfaces |
-| `developmentMode` | false |
-| `simulatorAutoStart` | false |
 | `activeProfile` | `default` |
 
 Network/port changes may require a restart; follow UI notices.

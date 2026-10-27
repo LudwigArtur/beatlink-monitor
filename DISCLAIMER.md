@@ -11,7 +11,7 @@ review for commercial distribution.
 
 ## Before every live deployment
 
-1. Start with the simulator and disabled outputs.
+1. Start with disabled outputs.
 2. Check network adapters, virtual player number, target console and command
    templates.
 3. Control only authorized, approved targets. grandMA Telnet can send commands

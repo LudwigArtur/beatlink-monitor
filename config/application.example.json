@@ -5,8 +5,6 @@
   "webUiPort": 17812,
   "allowLanAccess": false,
   "bpmDecimalPlaces": 2,
-  "developmentMode": false,
-  "simulatorAutoStart": false,
   "logLevel": "INFO",
   "activeProfile": "default"
 }

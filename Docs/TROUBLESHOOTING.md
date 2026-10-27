@@ -33,7 +33,6 @@
 - Check track analysis, media and device capabilities. Missing waveforms
   should not be confused with actual precise position data.
 - Restart after changing the adapter or waveform format.
-- Test the simulator separately to distinguish rendering from network problems.
 
 ## No output / unexpected console commands
 
