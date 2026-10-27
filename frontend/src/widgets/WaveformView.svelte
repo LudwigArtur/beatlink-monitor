@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
   import { api } from '../stores/api';
+  import { eqGains } from '../stores/eq';
+  import { applyRgbEq, eqChangesBrightness } from '../stores/eqRender';
   import type { PlayerState } from '../stores/types';
   import { robustMaxHeight } from './waveformScale';
 
@@ -75,6 +77,12 @@
     ctx.fillStyle = '#1b1c22';
     ctx.fillRect(0, 0, width, h);
 
+    // Mixer EQ -> brightness of the low/mid/high parts (see stores/eq.ts); no
+    // live mixer data means full brightness.
+    const gains = $eqGains[player.deviceNumber];
+    let applyRgbGains = false;
+    let drawBars: ((target: CanvasRenderingContext2D) => void) | null = null;
+
     const isThreeBand = waveType === 'THREE_BAND' && lowHeights && midHeights && highHeights;
     if (isThreeBand) {
       const columnCount = lowHeights!.length;
@@ -85,15 +93,19 @@
         const x = i * barWidth;
         const w = Math.max(1, barWidth - 0.5);
         const highBar = Math.min(h, (highHeights![i] / maxHeight) * h);
+        ctx.globalAlpha = gains?.high ?? 1;
         ctx.fillStyle = bandColors.high;
         ctx.fillRect(x, h - highBar, w, highBar);
         const midBar = Math.min(h, (midHeights![i] / maxHeight) * h);
+        ctx.globalAlpha = gains?.mid ?? 1;
         ctx.fillStyle = bandColors.mid;
         ctx.fillRect(x, h - midBar, w, midBar);
         const lowBar = Math.min(h, (lowHeights![i] / maxHeight) * h);
+        ctx.globalAlpha = gains?.low ?? 1;
         ctx.fillStyle = bandColors.low;
         ctx.fillRect(x, h - lowBar, w, lowBar);
       }
+      ctx.globalAlpha = 1;
     } else if (heights.length > 0) {
       const barWidth = width / heights.length;
       const fallbackColor = waveType === 'RGB' ? '#4fc3f7' : '#bbbbbb';
@@ -104,18 +116,28 @@
       // format-specific divisor (see `robustMaxHeight`'s doc comment for
       // why the strict maximum is avoided).
       const maxHeight = robustMaxHeight(heights);
-      heights.forEach((barHeightValue, i) => {
-        const barHeight = Math.min(h, (barHeightValue / maxHeight) * h);
-        // Real per-segment RGB colors decoded from the actual Pro DJ Link
-        // waveform data take priority (requirements specification §9.2); otherwise a flat
-        // color indicates the current waveform mode.
-        ctx.fillStyle = colors?.[i] ?? fallbackColor;
-        ctx.fillRect(i * barWidth, h - barHeight, Math.max(1, barWidth - 0.5), barHeight);
-      });
+      // Real per-segment RGB colors decoded from the actual Pro DJ Link
+      // waveform data take priority (requirements specification §9.2); otherwise a flat
+      // color indicates the current waveform mode.
+      drawBars = (target) => {
+        heights.forEach((barHeightValue, i) => {
+          const barHeight = Math.min(h, (barHeightValue / maxHeight) * h);
+          target.fillStyle = colors?.[i] ?? fallbackColor;
+          target.fillRect(i * barWidth, h - barHeight, Math.max(1, barWidth - 0.5), barHeight);
+        });
+      };
+      drawBars(ctx);
+      applyRgbGains = waveType === 'RGB' && eqChangesBrightness(gains);
     } else {
       ctx.fillStyle = '#555';
       ctx.font = '11px sans-serif';
       ctx.fillText('No Waveform', 8, h / 2 + 4);
+    }
+
+    if (applyRgbGains && gains && drawBars) {
+      // The RGB waveform's red/green/blue components stand for its low/mid/
+      // high frequency content, so each band is dimmed (or boosted) separately.
+      applyRgbEq(ctx, 0, 0, width, h, gains, drawBars);
     }
 
     // Playback cursor (requirements specification §9.4) - drawn as a filled bar with a
@@ -143,6 +165,7 @@
     // Redraw whenever playback position, the physical canvas size, or the
     // configured waveform height (requirements specification §10.4) updates.
     player.playbackPositionMs;
+    $eqGains;
     physicalWidth;
     physicalHeight;
     draw();

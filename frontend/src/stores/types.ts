@@ -4,7 +4,6 @@
 export type Availability = 'AVAILABLE' | 'UNKNOWN' | 'UNSUPPORTED';
 export type DeviceType = 'CDJ' | 'MIXER' | 'REKORDBOX' | 'UNKNOWN';
 export type WaveformType = 'RGB' | 'THREE_BAND' | 'CLASSIC' | 'NONE';
-export type PlayerSource = 'REAL' | 'SIMULATED';
 
 export interface PlayerState {
   deviceNumber: number;
@@ -36,7 +35,6 @@ export interface PlayerState {
   hasBeatGrid: boolean;
   lastUpdateTimestamp: number;
   dataAvailability: Record<string, Availability>;
-  source: PlayerSource;
 }
 
 export interface MasterClockState {
@@ -81,7 +79,6 @@ export interface DiagnosticsSnapshot {
   telnetConnected: boolean;
   lastTelnetCommand: string | null;
   uiWebSocketConnections: number;
-  simulatorRunning: boolean;
   logDirectory: string;
   ownDeviceNumber: number | null;
 }
@@ -91,13 +88,6 @@ export interface DiagnosticsMessage {
   diagnostics: DiagnosticsSnapshot;
 }
 
-export interface SimulatedTrack {
-  title: string;
-  artist: string;
-  trackId: number;
-  originalBpm: number;
-  durationMs: number;
-}
 
 export interface GrandMaConfig {
   enabled: boolean;
@@ -143,14 +133,200 @@ export interface ApplicationConfig {
   webUiPort: number;
   allowLanAccess: boolean;
   bpmDecimalPlaces: number;
-  developmentMode: boolean;
-  simulatorAutoStart: boolean;
   logLevel: string;
   activeProfile: string;
+  mixerIntegrationEnabled: boolean;
+  mixerControlEnabled: boolean;
+  mixerAddress: string | null;
+  mixerAnnounceIdentity: boolean;
+  cdjIntegrationEnabled: boolean;
+  cdjControlEnabled: boolean;
+  cdjRemoteEnabled: boolean;
+  mixerIdentityName: string;
 }
 
 export interface ApplicationConfigSaveResult {
   restartRequired: boolean;
+}
+
+export interface MixerChannelState {
+  channel: number;
+  input: number;
+  trim: number;
+  comp: number;
+  eqHi: number;
+  eqHiMid: number;
+  eqLoMid: number;
+  eqLow: number;
+  filter: number;
+  send: number;
+  cue: boolean;
+  cue2: number;
+  fader: number;
+  crossfaderAssign: number;
+}
+
+export interface MixerLiveState {
+  channels: MixerChannelState[];
+  crossfader: number;
+  masterLevel: number;
+  masterFilter: number;
+  masterCue: number;
+  isolatorOn: number;
+  isoHi: number;
+  isoMid: number;
+  isoLow: number;
+  booth: number;
+  boothHi: number;
+  boothLow: number;
+  fxFreqLow: number;
+  fxFreqMid: number;
+  fxFreqHi: number;
+  fxSelect: number;
+  fxChannel: number;
+  fxLevel: number;
+  fxOn: number;
+  hpMix: number;
+  hpLevel: number;
+}
+
+export interface UtilityValue {
+  id: number;
+  value: number | null;
+  timestampMs: number;
+}
+
+export interface MixerState {
+  live: MixerLiveState | null;
+  liveTimestampMs: number;
+  utilities: UtilityValue[];
+  version: string | null;
+}
+
+export interface UtilityItem {
+  id: number;
+  key: string;
+  label: string;
+  min: number;
+  max: number;
+  signed: boolean;
+  note: string | null;
+}
+
+export interface MixerLinkStatus {
+  integrationEnabled: boolean;
+  controlEnabled: boolean;
+  transportAvailable: boolean;
+  mixerAddress: string | null;
+  liveFramesReceived: number;
+  utilityRepliesReceived: number;
+  lastLiveFrameAgeMs: number | null;
+  lastError: string | null;
+  announcer: { state: 'OFF' | 'WAITING' | 'CLAIMING' | 'ONLINE' | 'NETWORK_FULL'; deviceNumber: number | null; name: string } | null;
+  utilityItems: UtilityItem[];
+}
+
+export interface MixerSnapshot {
+  state: MixerState;
+  link: MixerLinkStatus;
+}
+
+export type UtilityWriteStatus =
+  | 'CONFIRMED'
+  | 'MISMATCH'
+  | 'REJECTED'
+  | 'NO_REPLY'
+  | 'CONTROL_DISABLED'
+  | 'NO_MIXER'
+  | 'INVALID';
+
+export interface UtilityWriteResult {
+  status: UtilityWriteStatus;
+  id: number;
+  requestedValue: number;
+  reportedValue: number | null;
+  message: string | null;
+}
+
+export interface ChannelLevel {
+  channel: number;
+  left: number;
+  right: number;
+  bands: number[];
+}
+
+export interface AudioLevelStatus {
+  active: boolean;
+  framesReceived: number;
+  requestsSent: number;
+  levels: { channels: ChannelLevel[]; masterLeft: number; masterRight: number; clip: number[]; timestampMs: number } | null;
+}
+
+export interface CdjSettingItem {
+  offset: number;
+  key: string;
+  label: string;
+  min: number;
+  max: number;
+  note: string | null;
+}
+
+export interface CdjRemoteButton {
+  code: number;
+  key: string;
+  label: string;
+  group: string;
+}
+
+export interface CdjDeckFlags {
+  tempoReset: number;
+  tempoRatio: number;
+  masterTempo: number;
+  keySync: number;
+  vinylMode: number;
+  vinylSpeed: number;
+  slip: number;
+  autoCue: number;
+  quantize: number;
+}
+
+export interface CdjDeviceState {
+  deviceNumber: number;
+  settings: Record<string, number>;
+  settingsTimestampMs: number;
+  flags: CdjDeckFlags | null;
+  flagsTimestampMs: number;
+}
+
+export interface CdjLinkStatus {
+  integrationEnabled: boolean;
+  controlEnabled: boolean;
+  remoteEnabled: boolean;
+  transportAvailable: boolean;
+  settingsRepliesReceived: number;
+  statusRepliesReceived: number;
+  lastError: string | null;
+  settingItems: CdjSettingItem[];
+  buttons: CdjRemoteButton[];
+}
+
+export interface CdjSnapshot {
+  devices: CdjDeviceState[];
+  link: CdjLinkStatus;
+}
+
+export interface CdjWriteResult {
+  status: 'CONFIRMED' | 'MISMATCH' | 'NO_REPLY' | 'INVALID' | 'NO_DEVICE' | 'CONTROL_DISABLED';
+  deviceNumber: number;
+  offset: number;
+  requestedValue: number;
+  reportedValue: number | null;
+  message: string | null;
+}
+
+export interface CdjRemoteResult {
+  status: 'SENT' | 'REMOTE_DISABLED' | 'NO_DEVICE' | 'INVALID' | 'FAILED';
+  message: string | null;
 }
 
 export interface WidgetConfig {
@@ -190,6 +366,12 @@ export interface UiProfile {
   backgroundColor: string;
   inactiveDeckBrightnessPercent: number;
   waveformSmoothingFactor: number;
+  eqWaveformEnabled: boolean;
+  eqRawMin: number;
+  eqRawCenter: number;
+  eqMinBrightness: number;
+  eqBoostGlow: number;
+  eqMidSource: 'AUTO' | 'AVERAGE' | 'HI_MID' | 'LO_MID';
 }
 
 

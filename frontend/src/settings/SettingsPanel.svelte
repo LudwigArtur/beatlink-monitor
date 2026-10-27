@@ -15,6 +15,7 @@
     setInactiveDeckBrightnessPercent,
     setSlot,
     setWaveformSmoothingFactor,
+    updateProfile,
   } from '../stores/layout';
 
   let appConfig: ApplicationConfig | null = null;
@@ -31,7 +32,7 @@
   // re-selecting the number already in use by this app itself is allowed).
   $: occupiedDeviceNumbers = new Set(
     $players
-      .filter((p) => p.connected && p.source === 'REAL' && p.deviceNumber !== $diagnostics?.ownDeviceNumber)
+      .filter((p) => p.connected && p.deviceNumber !== $diagnostics?.ownDeviceNumber)
       .map((p) => p.deviceNumber),
   );
 
@@ -194,14 +195,6 @@
         BPM Decimal Places
         <input type="number" min="0" max="4" bind:value={appConfig.bpmDecimalPlaces} />
       </label>
-      <label title="Enables additional logging/debug information for development.">
-        <input type="checkbox" bind:checked={appConfig.developmentMode} />
-        Development Mode
-      </label>
-      <label title="Automatically starts the test-mode simulator on program startup.">
-        <input type="checkbox" bind:checked={appConfig.simulatorAutoStart} />
-        Auto-Start Simulator
-      </label>
       <button on:click={saveApp}>Save General Settings</button>
     </section>
 
@@ -262,6 +255,89 @@
         before a session, not during one.
       </p>
       <button on:click={saveApp}>Save Network Settings</button>
+    </section>
+
+    <section>
+      <h3>Mixer</h3>
+      <p class="hint">
+        Reads the live state of a DJM mixer (EQ, faders, crossfader, FX), its utility settings and firmware version.
+        Checked on one rig (DJM-V10, CDJ-3000). Changing a setting only happens when you press Write in the Mixer
+        tab, and counts as confirmed only after the mixer reports the new value back. See Docs/MIXER_CONTROL.md.
+      </p>
+      <label title="Listens for the mixer's live knob and fader positions and allows reading its utility settings. Hooks into the Pro DJ Link socket at startup, so a restart is required.">
+        <input type="checkbox" bind:checked={appConfig.mixerIntegrationEnabled} />
+        Enable mixer integration (restart required)
+      </label>
+      <label title="Additionally allows changing mixer utility settings (balance, limiter, attenuation, mic routing...) from the Mixer tab.">
+        <input type="checkbox" bind:checked={appConfig.mixerControlEnabled} disabled={!appConfig.mixerIntegrationEnabled} />
+        Allow changing mixer settings
+      </label>
+      <label title="Announces this app as an additional third-party participant (category 5, device number 54-57, like ShowKontrol) next to the virtual CDJ. A DJM-V10 only sent its live EQ/fader state to such a peer (observed). It adds one more device to your Pro DJ Link network.">
+        <input type="checkbox" bind:checked={appConfig.mixerAnnounceIdentity} disabled={!appConfig.mixerIntegrationEnabled} />
+        Announce as third-party device (needed for the live state)
+      </label>
+      <label title="Reads every CDJ's settings and deck flags (harmless requests, repeated every few seconds). Uses the same socket hook as the mixer integration, so a restart is required.">
+        <input type="checkbox" bind:checked={appConfig.cdjIntegrationEnabled} />
+        Read CDJ settings and deck flags (restart required)
+      </label>
+      <label title="Allows changing CDJ settings from the CDJs tab; confirmed only after the CDJ reports the new value.">
+        <input type="checkbox" bind:checked={appConfig.cdjControlEnabled} disabled={!appConfig.cdjIntegrationEnabled} />
+        Allow changing CDJ settings
+      </label>
+      <label title="Allows pressing CDJ buttons remotely (play, cue, hot cues, loops, beat jumps). This acts on live playback and anyone who can reach the web UI could use it. Off by default.">
+        <input type="checkbox" bind:checked={appConfig.cdjRemoteEnabled} disabled={!appConfig.cdjIntegrationEnabled} />
+        Allow remote CDJ buttons (affects playback!)
+      </label>
+      <label class="wide-field" title="IPv4 address of the mixer on the local network. Leave empty to use the mixer found by Pro DJ Link discovery.">
+        Mixer address (optional)
+        <input placeholder="e.g. 169.254.12.34" value={appConfig.mixerAddress ?? ''}
+          on:input={(e) => (appConfig!.mixerAddress = (e.target as HTMLInputElement).value.trim() || null)} />
+      </label>
+      <button on:click={saveApp}>Save Mixer Settings</button>
+
+      <h4>EQ controls waveform brightness</h4>
+      <p class="hint">
+        With live mixer data, each channel's EQ dims the matching part of that player's waveform: low = red (RGB) /
+        blue (three-band), mid = green / amber, high = blue / white. Channel N is taken to be fed by player N.
+        Knob fully down (raw 0) shows the minimum brightness, the center detent (raw 128) 100 %. Above the detent
+        the band glows up to the boost value at raw 255. The waveform data only has three bands: on a 4-band
+        mixer (e.g. DJM-V10) the mid part follows the average of Hi-Mid and Lo-Mid.
+      </p>
+      <label>
+        <input type="checkbox" checked={$activeProfile.eqWaveformEnabled}
+          on:change={(e) => updateProfile({ eqWaveformEnabled: (e.target as HTMLInputElement).checked })} />
+        Enabled
+      </label>
+      <label title="Raw EQ value of a knob turned fully down (minimum brightness).">
+        Raw value, knob fully down
+        <input type="number" min="0" max="255" value={$activeProfile.eqRawMin}
+          on:change={(e) => updateProfile({ eqRawMin: Number((e.target as HTMLInputElement).value) })} />
+      </label>
+      <label title="Raw EQ value of a knob at its center detent (100 % brightness).">
+        Raw value, knob at center
+        <input type="number" min="0" max="255" value={$activeProfile.eqRawCenter}
+          on:change={(e) => updateProfile({ eqRawCenter: Number((e.target as HTMLInputElement).value) })} />
+      </label>
+      <label title="Brightness of a band with its knob fully down, in percent.">
+        Minimum brightness (%)
+        <input type="number" min="0" max="100" value={Math.round($activeProfile.eqMinBrightness * 100)}
+          on:change={(e) => updateProfile({ eqMinBrightness: Math.min(100, Math.max(0, Number((e.target as HTMLInputElement).value))) / 100 })} />
+      </label>
+      <label title="Extra glow for a knob turned fully up (raw 255), in percent on top of 100 %. 0 = no boost.">
+        Boost above center (%)
+        <input type="number" min="0" max="100" value={Math.round($activeProfile.eqBoostGlow * 100)}
+          on:change={(e) => updateProfile({ eqBoostGlow: Math.min(100, Math.max(0, Number((e.target as HTMLInputElement).value))) / 100 })} />
+      </label>
+      <label title="Which EQ knob dims the mid part of the waveform.">
+        Mid band follows
+        <select value={$activeProfile.eqMidSource}
+          on:change={(e) => updateProfile({ eqMidSource: (e.target as HTMLSelectElement).value as 'AUTO' | 'AVERAGE' | 'HI_MID' | 'LO_MID' })}>
+          <option value="AUTO">Automatic (3-band: Hi-Mid, 4-band: average)</option>
+          <option value="AVERAGE">Average of Hi-Mid and Lo-Mid</option>
+          <option value="HI_MID">Hi-Mid only</option>
+          <option value="LO_MID">Lo-Mid only</option>
+        </select>
+      </label>
     </section>
   {/if}
 

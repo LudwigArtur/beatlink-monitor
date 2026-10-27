@@ -1,5 +1,5 @@
 import { writable } from 'svelte/store';
-import type { DiagnosticsSnapshot, MasterClockState, OutputStatus, PlayerState } from '../stores/types';
+import type { DiagnosticsSnapshot, MasterClockState, MixerState, OutputStatus, PlayerState } from '../stores/types';
 
 /**
  * Resolves the backend API base at runtime: in dev (Vite on 5173) it points
@@ -23,6 +23,7 @@ export const masterClock = writable<MasterClockState>({
   valid: false,
 });
 export const outputs = writable<OutputStatus[]>([]);
+export const mixerState = writable<MixerState>({ live: null, liveTimestampMs: 0, utilities: [], version: null });
 export const diagnostics = writable<DiagnosticsSnapshot | null>(null);
 export const connectionStatus = writable<'connecting' | 'open' | 'closed'>('connecting');
 
@@ -49,6 +50,7 @@ export function connectWebSocket(): void {
         players.set(message.players);
         masterClock.set(message.masterClock);
         outputs.set(message.outputs);
+        if (message.mixer) mixerState.set(message.mixer);
       } else if (message.type === 'diagnostics') {
         diagnostics.set(message.diagnostics);
       }

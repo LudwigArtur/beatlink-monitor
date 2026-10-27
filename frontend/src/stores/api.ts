@@ -2,12 +2,17 @@ import { API_BASE } from '../websocket/connection';
 import type {
   ApplicationConfig,
   ApplicationConfigSaveResult,
+  AudioLevelStatus,
   BeatGridResponse,
+  CdjRemoteResult,
+  CdjSnapshot,
+  CdjWriteResult,
+  MixerSnapshot,
   NetworkInterfaceInfo,
   OutputsConfig,
-  SimulatedTrack,
   TelnetConsoleLine,
   UiProfile,
+  UtilityWriteResult,
   WaveformResponse,
 } from '../stores/types';
 
@@ -41,23 +46,19 @@ export const api = {
   saveProfile: (profile: UiProfile) => request<void>('/api/profiles', { method: 'POST', body: JSON.stringify(profile) }),
   deleteProfile: (name: string) => request<void>(`/api/profiles/${encodeURIComponent(name)}`, { method: 'DELETE' }),
 
-  // --- Simulator -----------------------------------------------------------
-  simulatorStart: () => request<void>('/api/simulator/start', { method: 'POST' }),
-  simulatorStop: () => request<void>('/api/simulator/stop', { method: 'POST' }),
-  simulatorTracks: () => request<SimulatedTrack[]>('/api/simulator/tracks'),
-  simulatorConnect: (device: number) => request<void>(`/api/simulator/${device}/connect`, { method: 'POST' }),
-  simulatorDisconnect: (device: number) => request<void>(`/api/simulator/${device}/disconnect`, { method: 'POST' }),
-  simulatorPlay: (device: number) => request<void>(`/api/simulator/${device}/play`, { method: 'POST' }),
-  simulatorPause: (device: number) => request<void>(`/api/simulator/${device}/pause`, { method: 'POST' }),
-  simulatorMaster: (device: number) => request<void>(`/api/simulator/${device}/master`, { method: 'POST' }),
-  simulatorOnAir: (device: number, on: boolean) =>
-    request<void>(`/api/simulator/${device}/onair`, { method: 'POST', body: JSON.stringify({ action: 'onair', boolValue: on }) }),
-  simulatorPitch: (device: number, percent: number) =>
-    request<void>(`/api/simulator/${device}/pitch`, { method: 'POST', body: JSON.stringify({ action: 'pitch', value: percent }) }),
-  simulatorSeek: (device: number, positionMs: number) =>
-    request<void>(`/api/simulator/${device}/seek`, { method: 'POST', body: JSON.stringify({ action: 'seek', positionMs }) }),
-  simulatorLoad: (device: number, trackIndex: number) =>
-    request<void>(`/api/simulator/${device}/load/${trackIndex}`, { method: 'POST' }),
+  // --- Mixer ---------------------------------------------------------------
+  getMixer: () => request<MixerSnapshot>('/api/mixer'),
+  mixerReadAll: () => request<{ started: boolean }>('/api/mixer/utility/read', { method: 'POST' }),
+  mixerRead: (id: number) => request<{ sent: boolean }>(`/api/mixer/utility/${id}/read`, { method: 'POST' }),
+  getMixerLevels: () => request<AudioLevelStatus>('/api/mixer/levels'),
+  getCdj: () => request<CdjSnapshot>('/api/cdj'),
+  cdjRefresh: () => request<unknown>('/api/cdj/refresh', { method: 'POST' }),
+  cdjWriteSetting: (player: number, offset: number, value: number) =>
+    request<CdjWriteResult>(`/api/cdj/${player}/setting/${offset}`, { method: 'POST', body: JSON.stringify({ value }) }),
+  cdjButton: (player: number, code: number, press: 'click' | 'down' | 'up' = 'click') =>
+    request<CdjRemoteResult>(`/api/cdj/${player}/button/${code}?press=${press}`, { method: 'POST' }),
+  mixerWriteUtility: (id: number, value: number) =>
+    request<UtilityWriteResult>(`/api/mixer/utility/${id}`, { method: 'POST', body: JSON.stringify({ value }) }),
 
   // --- Outputs -------------------------------------------------------------
   grandMaTest: (bpm: number) =>

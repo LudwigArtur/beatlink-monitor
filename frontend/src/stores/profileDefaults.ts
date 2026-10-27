@@ -7,7 +7,6 @@ export const DEFAULT_GLOBAL_WIDGET_IDS = [
   'prodjlinkStatus',
   'linkStatus',
   'grandmaStatus',
-  'simulatorStatus',
 ] as const;
 
 export function defaultWidgets(): WidgetConfig[] {
@@ -45,5 +44,11 @@ export function defaultProfile(name = 'default'): UiProfile {
     backgroundColor: '#101014',
     inactiveDeckBrightnessPercent: 50,
     waveformSmoothingFactor: 0.08,
+    eqWaveformEnabled: true,
+    eqRawMin: 0,
+    eqRawCenter: 128,
+    eqMinBrightness: 0.1,
+    eqBoostGlow: 0.4,
+    eqMidSource: 'AUTO',
   };
 }

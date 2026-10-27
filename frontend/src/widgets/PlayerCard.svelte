@@ -36,7 +36,6 @@
       {#if player?.tempoMaster}<span class="badge master-badge">MASTER</span>{/if}
       {#if player?.onAir}<span class="badge onair-badge">ON AIR</span>{/if}
       {#if player?.looping}<span class="badge loop-badge">LOOP</span>{/if}
-      {#if player?.source === 'SIMULATED'}<span class="badge sim-badge">SIM</span>{/if}
     </span>
   </div>
 
@@ -120,7 +119,6 @@
   .master-badge { background: #ffb300; color: #201c00; }
   .onair-badge { background: #e53935; color: #fff; }
   .loop-badge { background: #ffeb3b; color: #201c00; }
-  .sim-badge { background: #455a64; color: #cfd8dc; }
   .track .title {
     font-size: 1.15em;
     font-weight: 600;

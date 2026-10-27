@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
   import { api } from '../stores/api';
+  import { eqGains, type BandGains } from '../stores/eq';
+  import { applyRgbEq, eqChangesBrightness } from '../stores/eqRender';
   import { activeProfile } from '../stores/layout';
   import type { PlayerState } from '../stores/types';
   import { robustMaxHeight } from '../widgets/waveformScale';
@@ -26,8 +28,7 @@
   // Hard-resyncing the client-side rAF extrapolation to every single one of
   // those tiny corrections (as this used to do unconditionally) made the
   // playhead visibly stutter forward and backward in lock-step with that
-  // jitter - never visible with the simulator's perfectly smooth synthetic
-  // position, but clearly noticeable against real hardware.
+  // jitter - clearly noticeable against real hardware.
   //
   // `HARD_RESYNC_THRESHOLD_MS`: a disagreement at least this large can only
   // be a genuine seek/jump (far beyond normal jitter), so snap immediately.
@@ -119,6 +120,13 @@
   // zoom level and every playback rate without re-rendering.
   let waveformBitmap: HTMLCanvasElement | null = null;
 
+  // One separate bitmap per frequency band, only built for a three-band
+  // waveform while a mixer EQ dims at least one band: the single combined
+  // bitmap above cannot be dimmed per band after the fact, whereas these
+  // can each be drawn with their own opacity. Costs three times the memory
+  // of the combined bitmap, hence built lazily and dropped on track change.
+  let bandBitmaps: { low: HTMLCanvasElement | null; mid: HTMLCanvasElement | null; high: HTMLCanvasElement | null } | null = null;
+
   // Beat grid (beat timestamps + position within bar), fetched once per
   // track load alongside the waveform buffer and rendered as tick marks in
   // a thin strip above the waveform - like a CDJ's beat/phrase markers.
@@ -187,6 +195,7 @@
       beatsWithinBar = [];
       beatGridAvailable = false;
       waveformBitmap = null; // don't show the old track's pre-rendered strip while the new one loads
+      bandBitmaps = null;
       fetchFullTrack(); // fetch once, immediately, for the newly loaded track
       fetchBeatGrid();
       // No valid previous extrapolation to reconcile against - hard resync.
@@ -269,6 +278,7 @@
           waveType === 'THREE_BAND'
             ? robustMaxHeight(bufferLowHeights ?? [], bufferMidHeights ?? [], bufferHighHeights ?? [])
             : robustMaxHeight(bufferHeights);
+        bandBitmaps = null;
         waveformBitmap = buildWaveformBitmap(
           bufferHeights,
           bufferColors,
@@ -292,6 +302,7 @@
         bufferHighHeights = null;
         bufferColors = null;
         waveformBitmap = null;
+        bandBitmaps = null;
         fullTrackRetryHandle = setTimeout(fetchFullTrack, 1000);
       }
     } catch (e) {
@@ -526,6 +537,32 @@
     return bitmap;
   }
 
+  /** Renders one three-band layer on its own, using the same smoothing and scaling as [buildWaveformBitmap]. */
+  function buildBandBitmap(heights: number[], color: string, maxHeight: number): HTMLCanvasElement | null {
+    if (heights.length === 0) return null;
+    const bitmap = document.createElement('canvas');
+    bitmap.width = heights.length;
+    const bitmapHeight = 256;
+    bitmap.height = bitmapHeight;
+    const ctx = bitmap.getContext('2d');
+    if (!ctx) return null;
+    ctx.fillStyle = color;
+    for (let i = 0; i < heights.length; i++) {
+      const bar = Math.min(bitmapHeight, (smooth(heights, i, 2) / maxHeight) * bitmapHeight);
+      ctx.fillRect(i, (bitmapHeight - bar) / 2, 1, bar);
+    }
+    return bitmap;
+  }
+
+  function ensureBandBitmaps() {
+    if (bandBitmaps || !bufferLowHeights || !bufferMidHeights || !bufferHighHeights) return;
+    bandBitmaps = {
+      low: buildBandBitmap(bufferLowHeights, THREE_BAND_COLORS.low, bufferMaxHeight),
+      mid: buildBandBitmap(bufferMidHeights, THREE_BAND_COLORS.mid, bufferMaxHeight),
+      high: buildBandBitmap(bufferHighHeights, THREE_BAND_COLORS.high, bufferMaxHeight),
+    };
+  }
+
   // Thin strip at the top of the canvas reserved for the beat grid ticks
   // (requirements specification: beat grid shown above the waveform per track, like a
   // CDJ's beat/phrase markers) - the waveform bars below it are shortened
@@ -572,17 +609,56 @@
         const destXStart = ((clippedSrcXStart - srcXStart) / (srcXEnd - srcXStart)) * width;
         const destXEnd = ((clippedSrcXEnd - srcXStart) / (srcXEnd - srcXStart)) * width;
         ctx.imageSmoothingEnabled = true;
-        ctx.drawImage(
-          waveformBitmap,
-          clippedSrcXStart,
-          0,
-          srcWidth,
-          bitmapHeight,
-          destXStart,
-          waveformTop,
-          destXEnd - destXStart,
-          waveformHeight,
-        );
+        const blit = (bitmap: HTMLCanvasElement, target: CanvasRenderingContext2D = ctx) =>
+          target.drawImage(
+            bitmap,
+            clippedSrcXStart,
+            0,
+            srcWidth,
+            bitmapHeight,
+            destXStart,
+            waveformTop,
+            destXEnd - destXStart,
+            waveformHeight,
+          );
+        // Mixer EQ -> brightness of the waveform's frequency bands (see
+        // stores/eq.ts). Without live mixer data `gains` is undefined and
+        // everything below is skipped.
+        const gains: BandGains | undefined = player ? $eqGains[player.deviceNumber] : undefined;
+        const adjusted = eqChangesBrightness(gains);
+        if (adjusted && waveType === 'THREE_BAND') {
+          ensureBandBitmaps();
+        }
+        if (adjusted && waveType === 'THREE_BAND' && bandBitmaps) {
+          // Same back-to-front order as the combined bitmap: high, mid, low. A gain above 1 draws
+          // the band once more additively (glow).
+          const layers: [HTMLCanvasElement | null, number][] = [
+            [bandBitmaps.high, gains.high],
+            [bandBitmaps.mid, gains.mid],
+            [bandBitmaps.low, gains.low],
+          ];
+          for (const [bitmap, gain] of layers) {
+            if (!bitmap) continue;
+            if (gain > 0) {
+              ctx.globalAlpha = Math.min(1, gain);
+              blit(bitmap);
+            }
+            if (gain > 1) {
+              ctx.globalCompositeOperation = 'lighter';
+              ctx.globalAlpha = gain - 1;
+              blit(bitmap);
+              ctx.globalCompositeOperation = 'source-over';
+            }
+          }
+          ctx.globalAlpha = 1;
+        } else {
+          blit(waveformBitmap);
+          if (adjusted && waveType === 'RGB') {
+            applyRgbEq(ctx, destXStart, waveformTop, destXEnd - destXStart, waveformHeight, gains, (target) =>
+              blit(waveformBitmap!, target),
+            );
+          }
+        }
       }
     } else {
       ctx.fillStyle = '#444';

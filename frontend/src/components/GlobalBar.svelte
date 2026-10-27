@@ -42,10 +42,6 @@
     <span class="dot" class:ok={grandMa?.connected}></span>
     <span>GrandMA2</span>
   </div>
-  <div class="status-group">
-    <span class="dot" class:ok={diagnostics?.simulatorRunning}></span>
-    <span>Simulator</span>
-  </div>
 </div>
 
 <style>

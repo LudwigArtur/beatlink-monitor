@@ -89,6 +89,12 @@ export function setWaveformSmoothingFactor(factor: number): void {
   void persist();
 }
 
+/** Applies a partial change to the live profile and persists it (used for the mixer EQ display settings). */
+export function updateProfile(patch: Partial<UiProfile>): void {
+  activeProfile.update((p) => ({ ...p, ...patch }));
+  void persist();
+}
+
 /** Refreshes the list of manually saved presets (not including live auto-save state). */
 export async function refreshPresetNames(): Promise<void> {
   try {

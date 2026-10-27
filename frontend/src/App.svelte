@@ -3,14 +3,15 @@
   import GlobalBar from './components/GlobalBar.svelte';
   import PlayerGrid from './components/PlayerGrid.svelte';
   import LiveView from './components/LiveView.svelte';
-  import SimulatorPanel from './simulator/SimulatorPanel.svelte';
   import SettingsPanel from './settings/SettingsPanel.svelte';
   import DiagnosticsView from './diagnostics/DiagnosticsView.svelte';
   import MaTelnetView from './matelnet/MaTelnetView.svelte';
+  import MixerPanel from './components/MixerPanel.svelte';
+  import CdjPanel from './components/CdjPanel.svelte';
   import { connectWebSocket, connectionStatus, diagnostics, masterClock, outputs, players } from './websocket/connection';
   import { activeProfile, initLayout, setFullscreenFlag } from './stores/layout';
 
-  type View = 'monitor' | 'liveview' | 'simulator' | 'matelnet' | 'settings' | 'diagnostics';
+  type View = 'monitor' | 'liveview' | 'matelnet' | 'mixer' | 'cdj' | 'settings' | 'diagnostics';
   let view: View = 'monitor';
   let mainEl: HTMLElement;
 
@@ -75,8 +76,9 @@
     <nav>
       <button class:active={view === 'monitor'} on:click={() => (view = 'monitor')}>Monitor</button>
       <button class="liveview-nav-button" on:click={openLiveView}>▶ Live View</button>
-      <button class:active={view === 'simulator'} on:click={() => (view = 'simulator')}>Simulator</button>
       <button class:active={view === 'matelnet'} on:click={() => (view = 'matelnet')}>MA Telnet</button>
+      <button class:active={view === 'mixer'} on:click={() => (view = 'mixer')}>Mixer</button>
+      <button class:active={view === 'cdj'} on:click={() => (view = 'cdj')}>CDJs</button>
       <button class:active={view === 'settings'} on:click={() => (view = 'settings')}>Settings</button>
       <button class:active={view === 'diagnostics'} on:click={() => (view = 'diagnostics')}>Diagnostics</button>
     </nav>
@@ -84,10 +86,12 @@
     <div class="scaled-content" style:transform={`scale(${$activeProfile.globalScale})`}>
       {#if view === 'monitor'}
         <PlayerGrid players={$players} masterClock={$masterClock} slots={$activeProfile.playerSlots} />
-      {:else if view === 'simulator'}
-        <SimulatorPanel players={$players} simulatorRunning={$diagnostics?.simulatorRunning ?? false} />
       {:else if view === 'matelnet'}
         <MaTelnetView />
+      {:else if view === 'mixer'}
+        <MixerPanel />
+      {:else if view === 'cdj'}
+        <CdjPanel />
       {:else if view === 'settings'}
         <SettingsPanel />
       {:else if view === 'diagnostics'}

@@ -22,7 +22,6 @@
         <tr><td>Telnet status</td><td>{diagnostics.telnetConnected ? 'Connected' : 'Disconnected'}</td></tr>
         <tr><td>Last Telnet command</td><td>{diagnostics.lastTelnetCommand ?? '—'}</td></tr>
         <tr><td>UI WebSocket connections</td><td>{diagnostics.uiWebSocketConnections}</td></tr>
-        <tr><td>Simulator status</td><td>{diagnostics.simulatorRunning ? 'Running' : 'Stopped'}</td></tr>
         <tr><td>Log directory</td><td class="monospace">{diagnostics.logDirectory}</td></tr>
       </tbody>
     </table>
