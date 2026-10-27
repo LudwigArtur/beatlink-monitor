@@ -196,6 +196,10 @@ export interface UtilityValue {
 }
 
 export interface MixerState {
+  /** Name the mixer announces, e.g. "DJM-A9". */
+  model?: string | null;
+  /** 3 or 4 for models checked on real hardware (DJM-A9, DJM-V10), null for unknown models. */
+  eqBands?: number | null;
   live: MixerLiveState | null;
   liveTimestampMs: number;
   utilities: UtilityValue[];

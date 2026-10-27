@@ -328,7 +328,7 @@
         Mid band follows
         <select value={$activeProfile.eqMidSource}
           on:change={(e) => updateProfile({ eqMidSource: (e.target as HTMLSelectElement).value as 'AUTO' | 'AVERAGE' | 'HI_MID' | 'LO_MID' })}>
-          <option value="AUTO">Automatic (3-band: Hi-Mid, 4-band: average)</option>
+          <option value="AUTO">Automatic by mixer model (A9, 3-band: Hi-Mid; V10, 4-band: average)</option>
           <option value="AVERAGE">Average of Hi-Mid and Lo-Mid</option>
           <option value="HI_MID">Hi-Mid only</option>
           <option value="LO_MID">Lo-Mid only</option>

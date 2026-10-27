@@ -27,7 +27,15 @@ export function eqGain(raw: number, rawMin: number, rawCenter: number, minBright
 }
 
 /**
- * 3-band mixers keep their single mid knob in Hi-Mid and leave Lo-Mid at 0 on every channel (seen in
+ * Whether the mixer has a 3-band EQ: decided by the model it announces (DJM-A9: 3, DJM-V10: 4); only for a model
+ * that is not known the data decides (see [looksThreeBand]).
+ */
+export function isThreeBand(eqBands: number | null | undefined, channels: MixerChannelState[]): boolean {
+  return eqBands != null ? eqBands === 3 : looksThreeBand(channels);
+}
+
+/**
+ * Fallback for unknown models: 3-band mixers keep their single mid knob in Hi-Mid and leave Lo-Mid at 0 on every channel (seen in
  * data of a real DJM-V10); detected here as "all Lo-Mid values in the kill region while some Hi-Mid is not".
  */
 export function looksThreeBand(channels: MixerChannelState[]): boolean {
@@ -60,7 +68,7 @@ export const eqGains = derived(
   ([$mixer, $profile], set) => {
     const next: Record<number, BandGains> = {};
     if ($profile.eqWaveformEnabled && $mixer.live) {
-      const threeBand = looksThreeBand($mixer.live.channels);
+      const threeBand = isThreeBand($mixer.eqBands, $mixer.live.channels);
       for (const channel of $mixer.live.channels) next[channel.channel] = bandGainsFor(channel, $profile, threeBand);
     }
     const key = JSON.stringify(next);

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
   import { api } from '../stores/api';
-  import { bandGainsFor, looksThreeBand } from '../stores/eq';
+  import { bandGainsFor, isThreeBand } from '../stores/eq';
   import { activeProfile } from '../stores/layout';
   import type { AudioLevelStatus, MixerLinkStatus, UtilityItem, UtilityWriteResult } from '../stores/types';
   import { mixerState } from '../websocket/connection';
@@ -50,6 +50,16 @@
 
   $: reported = new Map($mixerState.utilities.map((u) => [u.id, u.value]));
   $: channels = $mixerState.live?.channels.slice(0, 6) ?? [];
+  $: threeBand = isThreeBand($mixerState.eqBands, channels);
+  $: eqDescription = $mixerState.eqBands
+    ? $mixerState.eqBands + '-band (by model)'
+    : (threeBand ? '3' : '4') + '-band (model unknown, detected from the data)';
+  $: midDescription =
+    $activeProfile.eqMidSource !== 'AUTO'
+      ? $activeProfile.eqMidSource.replace('_', '-').toLowerCase()
+      : threeBand
+        ? 'Hi-Mid'
+        : 'the average of Hi-Mid and Lo-Mid';
   $: items = link?.utilityItems ?? [];
   $: canWrite = !!link && (link.integrationEnabled && link.controlEnabled && link.transportAvailable);
 
@@ -111,6 +121,10 @@
           {#if link.lastLiveFrameAgeMs != null}(last {(link.lastLiveFrameAgeMs / 1000).toFixed(1)} s ago){/if}
         </li>
         <li>Utility replies received: <b>{link.utilityRepliesReceived}</b></li>
+        <li>
+          EQ:
+          <b>{eqDescription}</b>, mid brightness follows <b>{midDescription}</b>
+        </li>
         <li>Mixer firmware version: <b>{$mixerState.version ?? 'unknown'}</b></li>
         <li>
           Extra identity (category 5):
@@ -136,7 +150,7 @@
         </thead>
         <tbody>
           {#each channels as channel (channel.channel)}
-            {@const gains = bandGainsFor(channel, $activeProfile, looksThreeBand(channels))}
+            {@const gains = bandGainsFor(channel, $activeProfile, isThreeBand($mixerState.eqBands, channels))}
             <tr>
               <td>{channel.channel}</td>
               <td>{channel.eqHi}</td>
