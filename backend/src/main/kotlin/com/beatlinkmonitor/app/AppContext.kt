@@ -4,6 +4,7 @@ import com.beatlinkmonitor.config.ApplicationConfig
 import com.beatlinkmonitor.config.ConfigurationService
 import com.beatlinkmonitor.diagnostics.DiagnosticsService
 import com.beatlinkmonitor.cdj.CdjLinkService
+import com.beatlinkmonitor.cdj.RemoteUnlockService
 import com.beatlinkmonitor.mixer.AudioLevelService
 import com.beatlinkmonitor.mixer.MixerLinkService
 import com.beatlinkmonitor.mixer.PeerAnnouncer
@@ -45,6 +46,7 @@ class AppContext(
         { mixerTransport.ensureInstalled() },
         { peerAnnouncer.status() },
     ).also { mixerTransport.identityOverride = { peerAnnouncer.activeIdentity() } }
+    val remoteUnlock = RemoteUnlockService(pinFile = { java.io.File(configurationService.rootDir, RemoteUnlockService.PIN_FILE_NAME) })
     val audioLevels: AudioLevelService = AudioLevelService(applicationState, { applicationConfig }, mixerTransport.audioTransport)
     val cdjLink: CdjLinkService = CdjLinkService(applicationState, { applicationConfig }, mixerTransport)
     val outputManager = OutputManager(applicationState, configurationService)

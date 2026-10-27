@@ -36,7 +36,6 @@ data class CdjDeviceState(
 data class CdjLinkStatus(
     val integrationEnabled: Boolean,
     val controlEnabled: Boolean,
-    val remoteEnabled: Boolean,
     val transportAvailable: Boolean,
     val settingsRepliesReceived: Long,
     val statusRepliesReceived: Long,
@@ -62,7 +61,7 @@ data class CdjWriteResult(
 )
 
 @Serializable
-enum class CdjRemoteStatus { SENT, REMOTE_DISABLED, NO_DEVICE, INVALID, FAILED }
+enum class CdjRemoteStatus { SENT, NO_DEVICE, INVALID, FAILED }
 
 @Serializable
 data class CdjRemoteResult(val status: CdjRemoteStatus, val message: String? = null)
@@ -70,7 +69,7 @@ data class CdjRemoteResult(val status: CdjRemoteStatus, val message: String? = n
 /**
  * Reads the per-player settings and deck flags of every CDJ (harmless requests, repeated every few
  * seconds the way the reference application does) and optionally changes a setting or presses a button
- * remotely. A setting write counts as confirmed only after the CDJ itself reports the new value;
+ * remotely (the caller has to make sure the client is allowed to, see [RemoteUnlockService]). A setting write counts as confirmed only after the CDJ itself reports the new value;
  * button presses have no acknowledgement and are only reported as sent.
  */
 class CdjLinkService(
@@ -151,7 +150,7 @@ class CdjLinkService(
         }
         for ((number, session) in remoteSessions) {
             when {
-                now - session.lastCommandAt > REMOTE_IDLE_MS || !config().cdjRemoteEnabled -> endRemoteSession(number)
+                now - session.lastCommandAt > REMOTE_IDLE_MS -> endRemoteSession(number)
                 now - session.lastConnectAt >= REMOTE_KEEPALIVE_MS -> connectRemote(number, now)
             }
         }
@@ -191,7 +190,6 @@ class CdjLinkService(
         return CdjLinkStatus(
             integrationEnabled = cfg.cdjIntegrationEnabled,
             controlEnabled = cfg.cdjControlEnabled,
-            remoteEnabled = cfg.cdjRemoteEnabled,
             transportAvailable = transport.available,
             settingsRepliesReceived = settingsReplies.get(),
             statusRepliesReceived = statusReplies.get(),
@@ -256,7 +254,6 @@ class CdjLinkService(
     fun pressButton(deviceNumber: Int, code: Int, press: CdjProtocol.Press = CdjProtocol.Press.CLICK): CdjRemoteResult {
         if (CdjRemoteButtons.byCode(code) == null) return CdjRemoteResult(CdjRemoteStatus.INVALID, "Unknown button code")
         val cfg = config()
-        if (!cfg.cdjRemoteEnabled) return CdjRemoteResult(CdjRemoteStatus.REMOTE_DISABLED, "Remote control of CDJs is disabled in the settings")
         if (!cfg.cdjIntegrationEnabled || !transport.available) return CdjRemoteResult(CdjRemoteStatus.NO_DEVICE, "CDJ integration is not active")
         val target = target(deviceNumber) ?: return CdjRemoteResult(CdjRemoteStatus.NO_DEVICE, "Player $deviceNumber is not a CDJ on the network")
         val identity = transport.identity() ?: return CdjRemoteResult(CdjRemoteStatus.NO_DEVICE, "No local Pro DJ Link identity yet")

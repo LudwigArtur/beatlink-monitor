@@ -5,6 +5,7 @@ import com.beatlinkmonitor.config.ApplicationConfig
 import com.beatlinkmonitor.config.OutputsConfig
 import com.beatlinkmonitor.config.UiProfile
 import com.beatlinkmonitor.cdj.CdjProtocol
+import com.beatlinkmonitor.cdj.RemoteUnlockStatus
 import com.beatlinkmonitor.mixer.MixerSnapshot
 import com.beatlinkmonitor.mixer.UtilityWriteRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -64,6 +65,7 @@ fun Application.apiModule(context: AppContext) {
     install(CORS) {
         anyHost()
         allowHeader(io.ktor.http.HttpHeaders.ContentType)
+        allowHeader(CONNECTION_HEADER)
         allowMethod(io.ktor.http.HttpMethod.Get)
         allowMethod(io.ktor.http.HttpMethod.Post)
         allowMethod(io.ktor.http.HttpMethod.Delete)
@@ -71,6 +73,10 @@ fun Application.apiModule(context: AppContext) {
 
     routing {
         webSocket("/ws") {
+            val connectionId = newConnectionId()
+            context.remoteUnlock.connectionOpened(connectionId)
+            // First message, so that a client knows its connection id before any state arrives.
+            runCatching { send(Frame.Text("""{"type":"hello","connectionId":"$connectionId"}""")) }
             context.diagnostics.uiWebSocketConnections++
             logger.info { "UI WebSocket client connected (${context.diagnostics.uiWebSocketConnections} active)" }
             val json = Json { encodeDefaults = true }
@@ -115,6 +121,7 @@ fun Application.apiModule(context: AppContext) {
                     }
                 }
             } finally {
+                context.remoteUnlock.connectionClosed(connectionId)
                 pushJob.cancel()
                 diagnosticsJob.cancel()
                 context.diagnostics.uiWebSocketConnections--
@@ -419,6 +426,27 @@ fun Application.apiModule(context: AppContext) {
                 call.respond(context.cdjLink.writeSetting(player, offset, body.value))
             }
         }
+        // Remote buttons are unlocked per WebSocket connection with the PIN from remote-pin.txt on the server.
+        get("/api/cdj/remote") { call.respond(context.remoteUnlock.info(call.request.headers[CONNECTION_HEADER])) }
+        post("/api/cdj/remote/unlock") {
+            if (!isTrustedOrigin(call)) {
+                call.respond(HttpStatusCode.Forbidden)
+            } else {
+                val body = call.receive<RemoteUnlockRequest>()
+                val result = context.remoteUnlock.unlock(call.request.headers[CONNECTION_HEADER], body.pin, call.request.local.remoteHost)
+                val code = when (result.status) {
+                    RemoteUnlockStatus.UNLOCKED -> HttpStatusCode.OK
+                    RemoteUnlockStatus.LOCKED_OUT -> HttpStatusCode.TooManyRequests
+                    RemoteUnlockStatus.WRONG_PIN, RemoteUnlockStatus.UNKNOWN_CONNECTION -> HttpStatusCode.Forbidden
+                    else -> HttpStatusCode.Conflict
+                }
+                call.respond(code, result)
+            }
+        }
+        post("/api/cdj/remote/lock") {
+            context.remoteUnlock.lock(call.request.headers[CONNECTION_HEADER])
+            call.respond(HttpStatusCode.OK)
+        }
         post("/api/cdj/{player}/button/{code}") {
             val player = call.parameters["player"]?.toIntOrNull()
             val code = call.parameters["code"]?.toIntOrNull()
@@ -432,6 +460,8 @@ fun Application.apiModule(context: AppContext) {
                 call.respond(HttpStatusCode.BadRequest)
             } else if (!isTrustedOrigin(call)) {
                 call.respond(HttpStatusCode.Forbidden, "Cross-origin CDJ control is not allowed")
+            } else if (!context.remoteUnlock.isUnlocked(call.request.headers[CONNECTION_HEADER])) {
+                call.respond(HttpStatusCode.Forbidden, "Remote buttons are locked: enter the PIN first")
             } else {
                 call.respond(context.cdjLink.pressButton(player, code, press))
             }
@@ -495,6 +525,16 @@ fun Application.apiModule(context: AppContext) {
             default("index.html")
         }
     }
+}
+
+private const val CONNECTION_HEADER = "X-Connection-Id"
+
+@kotlinx.serialization.Serializable
+private data class RemoteUnlockRequest(val pin: String)
+
+private fun newConnectionId(): String {
+    val bytes = ByteArray(16).also { java.security.SecureRandom().nextBytes(it) }
+    return bytes.joinToString("") { "%02x".format(it) }
 }
 
 private fun device(call: ApplicationCall): Int = call.parameters["device"]!!.toInt()

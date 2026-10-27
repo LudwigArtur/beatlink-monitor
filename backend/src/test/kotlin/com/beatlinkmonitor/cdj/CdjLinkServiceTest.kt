@@ -41,7 +41,12 @@ class CdjLinkServiceTest {
                         for (offset in CdjProtocol.SETTINGS_FIRST_OFFSET..CdjProtocol.SETTINGS_LAST_OFFSET) frame[offset] = (0x80 or settings[offset]).toByte()
                     }, CdjProtocol.SETTINGS_FRAME_LENGTH)
                 }
-                CdjProtocol.TYPE_STATUS_REQUEST -> link.handlePacket(reply(CdjProtocol.TYPE_STATUS_REPLY, 0x38) { it[0x32] = 1 }, 0x38)
+                CdjProtocol.TYPE_STATUS_REQUEST -> link.handlePacket(reply(CdjProtocol.TYPE_STATUS_REPLY, 0x38) {
+                    it[0x32] = 1
+                    it[0x28] = 0x31; it[0x29] = 0x38 // 12600 = 126.00 BPM
+                    it[0x2a] = 0xff.toByte(); it[0x2b] = 0xb5.toByte() // -75 = -0.75 %
+                    it[0x2e] = 1
+                }, 0x38)
             }
         }
 
@@ -103,7 +108,11 @@ class CdjLinkServiceTest {
         val device = f.link.snapshot().devices.single()
         assertEquals(2, device.deviceNumber)
         assertEquals(1, device.settings[0x34])
-        assertEquals(1, device.flags?.slip)
+        assertEquals(true, device.flags?.slip)
+        assertEquals(126.0, device.flags?.trackBpm)
+        assertEquals(-0.75, device.flags?.pitchPercent)
+        assertEquals(true, device.flags?.sync)
+        assertEquals(false, device.flags?.keySync)
         assertEquals(2, f.cdj.sent.size) // only the CDJ is addressed, not the mixer
         assertTrue(f.cdj.sent.all { it.address.hostAddress == "169.254.1.2" && it.port == 50002 })
     }
@@ -144,15 +153,12 @@ class CdjLinkServiceTest {
     }
 
     @Test
-    fun `remote buttons are off by default and go to the beat port when enabled`() {
-        val off = Fixture(FakeCdj(mac), ApplicationConfig())
-        assertEquals(CdjRemoteStatus.REMOTE_DISABLED, off.link.pressButton(2, 20).status)
-        assertTrue(off.cdj.sent.isEmpty())
-
-        val on = Fixture(FakeCdj(mac), ApplicationConfig(cdjRemoteEnabled = true))
+    fun `remote buttons go to the beat port and open a session first`() {
+        val on = Fixture(FakeCdj(mac), ApplicationConfig())
         assertEquals(CdjRemoteStatus.SENT, on.link.pressButton(2, 20).status)
         assertEquals(CdjRemoteStatus.INVALID, on.link.pressButton(2, 999).status)
         assertEquals(CdjRemoteStatus.NO_DEVICE, on.link.pressButton(4, 20).status)
+        assertEquals(CdjRemoteStatus.NO_DEVICE, on.link.pressButton(33, 20).status)
         assertEquals(listOf(0x2a, 0x36), on.cdj.sent.map { it.data.size }) // connect, then the click
         assertTrue(on.cdj.sent.all { it.port == 50001 })
         assertNotNull(on.link.snapshot())

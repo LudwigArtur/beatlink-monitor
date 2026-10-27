@@ -14,18 +14,28 @@ data class CdjSettingItem(
     val note: String? = null,
 )
 
-/** The nine flags of a type-0x69 status reply; names are inferred from the order of the fields and still unverified. */
+/**
+ * Deck state of a type-0x69 reply. Offsets and how each one was verified on CDJ-3000s (fw 3.22): tempoReset 0x27
+ * (TEMPO RESET button), trackBpm 0x28 (u16, BPM x 100, matches the track BPM of all four decks), pitchPercent 0x2a
+ * (i16, % x 100, matches the status packets), masterTempo 0x2c, keySync 0x2d, sync 0x2e (SYNC button via remote),
+ * tempoMaster 0x2f (matches the master flag; only one master seen), vinylMode 0x30 (setting "Jog Mode Vinyl"),
+ * slip 0x32 (SLIP via remote), autoCue 0x33 (setting "Auto Cue"), quantize 0x34 (QUANTIZE via remote).
+ * [unknown31] at 0x31 never changed (jog touch, settings): its meaning is open.
+ */
 @Serializable
 data class CdjDeckFlags(
-    val tempoReset: Int,
-    val tempoRatio: Int,
-    val masterTempo: Int,
-    val keySync: Int,
-    val vinylMode: Int,
-    val vinylSpeed: Int,
-    val slip: Int,
-    val autoCue: Int,
-    val quantize: Int,
+    val tempoReset: Boolean,
+    val trackBpm: Double,
+    val pitchPercent: Double,
+    val masterTempo: Boolean,
+    val keySync: Boolean,
+    val sync: Boolean,
+    val tempoMaster: Boolean,
+    val vinylMode: Boolean,
+    val unknown31: Int,
+    val slip: Boolean,
+    val autoCue: Boolean,
+    val quantize: Boolean,
 )
 
 /** Frames used to read and change the per-player settings and to press a CDJ's buttons remotely. */
@@ -148,16 +158,22 @@ object CdjProtocol {
         val device = data[0x21].toInt() and 0xff
         if (device !in 1..6) return null
         fun u(offset: Int) = data[offset].toInt() and 0xff
+        fun on(offset: Int) = u(offset) == 1
+        val bpm = (u(0x28) shl 8) or u(0x29)
+        val pitch = ((u(0x2a) shl 8) or u(0x2b)).toShort().toInt()
         val flags = CdjDeckFlags(
-            tempoReset = u(0x27),
-            tempoRatio = data[0x2a].toInt(),
-            masterTempo = u(0x2c),
-            keySync = u(0x2d),
-            vinylMode = u(0x30),
-            vinylSpeed = u(0x31),
-            slip = u(0x32),
-            autoCue = u(0x33),
-            quantize = u(0x34),
+            tempoReset = on(0x27),
+            trackBpm = bpm / 100.0,
+            pitchPercent = pitch / 100.0,
+            masterTempo = on(0x2c),
+            keySync = on(0x2d),
+            sync = on(0x2e),
+            tempoMaster = on(0x2f),
+            vinylMode = on(0x30),
+            unknown31 = u(0x31),
+            slip = on(0x32),
+            autoCue = on(0x33),
+            quantize = on(0x34),
         )
         return StatusReply(device, flags, (0x24 until length.coerceAtMost(0x60)).map { u(it) })
     }
