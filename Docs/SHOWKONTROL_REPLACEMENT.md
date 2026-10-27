@@ -24,12 +24,12 @@ a proposed order of work. It is a planning document, not a promise.
 | Players: status, BPM, master, on-air, beats, position | yes | yes (beat-link) |
 | Track metadata, beat grid, waveforms (blue / RGB / 3-band), cues | yes | yes (beat-link); phrase analysis (PSSI) not used |
 | Mixer live state (faders, EQ, FX, crossfader) | yes (`0x39`) | works on a real DJM-V10 (one rig) with the experimental third-party identity, see [MIXER_CONTROL.md](MIXER_CONTROL.md) |
-| Mixer utility settings read/write | yes (`0x3a`/`0x3b`) | read verified on a real DJM-V10; write not yet tried on hardware; off by default |
+| Mixer utility settings read/write | yes (`0x3a`/`0x3b`) | read and write (read-back confirmed) verified on a real DJM-V10, see [MIXER_CONTROL.md](MIXER_CONTROL.md); on by default |
 | Mixer firmware version | yes (`0x30`/`0x31`) | yes (probe while the integration is on) |
-| Mixer audio levels | yes (`0x57`/`0x58`) | not yet; layout known |
-| CDJ settings read (42 items) / write | yes (`0x6b`/`0x6c`, UDP 50002) | not yet; layout known |
-| CDJ deck flags (quantize, slip, master tempo, key sync, ...) | yes (`0x68`/`0x69`) | not yet |
-| Remote buttons (play, cue, hot cues, loops, beat jump) | yes (`0x07`, UDP 50001) | not yet; **writes to devices** |
+| Mixer audio levels | yes (`0x57`/`0x58`) | works on a real DJM-V10 (streams unasked, 512-byte frames), meters in the Mixer tab |
+| CDJ settings read (42 items) / write | yes (`0x6b`/`0x6c`, UDP 50002) | read and write verified on CDJ-3000s, see [CDJ_CONTROL.md](CDJ_CONTROL.md) |
+| CDJ deck state (BPM, pitch, sync, key sync, slip, quantize, ...) | yes (`0x68`/`0x69`) | yes, all offsets but one identified on CDJ-3000s |
+| Remote buttons (play, cue, hot cues, loops, beat jump) | yes (`0x07`, UDP 50001) | yes, behind a server-side PIN per connection; slip tried on a CDJ-3000 |
 | Outputs | 36 types: MA, OSC, MIDI, Art-Net, sACN, TCNet, ... | grandMA2 Telnet, Ableton Link |
 | Other inputs | StagelinQ, TCNet, LTC/MTC/Art-Net timecode, PSN, DMX in | none |
 | Show logic | node patch editor, cue lists, set lists, tracker | none |
@@ -54,22 +54,20 @@ a proposed order of work. It is a planning document, not a promise.
   (button code, state); codes for play/pause, cue, sync, master, quantize, slip,
   hot cues A-H set/delete, loops and beat jump are known.
 - **Audio levels:** a `0x57` request (re-sent every 3 s) is answered with a
-  `0x20c`-byte `0x58` frame of 16-bit level words per channel.
+  `0x58` frame of 16-bit level words per channel (a DJM-V10 streams it unasked, 512 bytes).
 
 ## Proposed order
 
 1. ~~Verify the existing mixer path on the real DJM-V10~~ Done for reading (one rig): live
    state, version and utility reads work; **still open:** utility writes (needs a deliberate,
    muted-PA test), other channels/models, the unnamed `0x39` bytes.
-2. **Read-only extras:** the CDJ's second status form (`0x124`) now arrives and is only
-   filtered; CDJ settings read (`0x6b`/`0x6c`), deck flags
-   (`0x68`/`0x69`), mixer audio levels (`0x57`/`0x58`). Low risk, high value for
-   monitoring and level-driven visuals.
+2. ~~Read-only extras~~ Done: CDJ settings, deck state and mixer audio levels. The CDJ's second
+   status form (`0x124`) still arrives and is only filtered.
 3. **Outputs:** pick the ones actually needed from ShowKontrol's list (OSC and MIDI
    are the cheapest and most generic; Art-Net/sACN next), driven by derived data keys
    like `deck.*`, `mixer.*`.
-4. **Writes to devices** (CDJ settings, remote buttons, load track): only after
-   hardware verification, always behind explicit switches.
+4. **Writes to devices:** mixer utility settings, CDJ settings and remote buttons are done
+   (remote buttons behind a PIN); load track is not implemented.
 5. **Show logic and extra inputs** (timecode, StagelinQ, cue lists): scope to be
    decided; these are the largest part of ShowKontrol.
 

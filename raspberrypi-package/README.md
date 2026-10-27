@@ -129,7 +129,7 @@ waveform brightness and the Mixer tab), its utility settings, and every CDJ's se
 deck flags (CDJs tab). This is **on by default** and includes announcing the app as one
 extra third-party device (number 54-57) on the Pro DJ Link network, which the mixer needs
 before it sends its live state. Changing mixer or CDJ settings only happens on an explicit
-request and is confirmed by read-back; remote CDJ buttons are off by default. Restart after
+request and is confirmed by read-back; remote CDJ buttons need a PIN from a file you create on the Pi (`remote-pin.txt` in the data directory, see Docs/CDJ_CONTROL.md). Restart after
 changing these options. Checked on one rig (DJM-V10, CDJ-3000); see
 [Docs/MIXER_CONTROL.md](../Docs/MIXER_CONTROL.md) and
 [Docs/CDJ_CONTROL.md](../Docs/CDJ_CONTROL.md) in the source repository.

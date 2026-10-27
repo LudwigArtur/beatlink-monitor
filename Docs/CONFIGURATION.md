@@ -29,7 +29,6 @@ configuration.
 | `mixerIdentityName` | Device name of that identity (ASCII, max 20), default `BEATLINK-MON` |
 | `cdjIntegrationEnabled` | true; reads every CDJ's settings and deck flags, restart required (see [CDJ control](CDJ_CONTROL.md)) |
 | `cdjControlEnabled` | true; allows writing CDJ settings (explicit request in the CDJs tab/API, confirmed by read-back) |
-| `cdjRemoteEnabled` | false; allows pressing CDJ buttons remotely (play, cue, hot cues ...); acts on live playback |
 | `webUiPort` | 17812 |
 | `allowLanAccess` | false: loopback only; true: all IPv4 interfaces |
 | `activeProfile` | `default` |

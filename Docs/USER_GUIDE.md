@@ -45,10 +45,12 @@ on untrusted networks.
 
 ## 5. CDJs
 
-The CDJs tab shows, per player, the 42 CDJ settings and the deck flags (master tempo, vinyl mode, auto cue,
+The CDJs tab shows, per player, the 42 CDJ settings and the deck state (BPM, pitch, sync, key sync, master tempo, vinyl mode, auto cue,
 quantize ...) as the CDJ reports them. "Write" changes one setting and only reports success after the CDJ
-confirmed the new value. Remote buttons (play, cue, hot cues, loops, beat jumps) are off by default and appear
-only after you enable "Allow remote CDJ buttons" in Settings; they act on live playback immediately. See
+confirmed the new value. Remote buttons (play, cue, hot cues, loops, beat jumps) act on live playback immediately and are therefore
+locked: create the file `remote-pin.txt` with a PIN (at least 4 characters) in the data directory of the backend
+on the server, then enter that PIN in the CDJs tab. The unlock applies to this one connection only; every device has to
+enter the PIN again after every (re)connect or page reload. See
 [CDJ control](CDJ_CONTROL.md).
 
 ## 6. grandMA2 / MA Telnet
