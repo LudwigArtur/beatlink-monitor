@@ -3,6 +3,9 @@
   import { api } from '../stores/api';
   import { diagnostics, players } from '../websocket/connection';
   import { SMOOTHING_LEVELS, smoothingLevel } from '../stores/smoothing';
+  import RemotePinSettings from '../components/RemotePinSettings.svelte';
+  import PinSetupDialog from '../components/PinSetupDialog.svelte';
+  import { remoteInfo } from '../stores/remotePin';
   import type { ApplicationConfig, NetworkInterfaceInfo, OutputsConfig, PlayerSlotConfig } from '../stores/types';
   import {
     activeProfile,
@@ -60,16 +63,47 @@
 
   onMount(async () => {
     appConfig = await api.getApplicationConfig();
+    lanAccessSaved = appConfig.allowLanAccess;
     outputsConfig = await api.getOutputsConfig();
     interfaces = await api.getNetworkInterfaces();
   });
 
+  // Network visibility lets other devices reach the hardware controls, so every time it is turned on a new PIN is
+  // created first; the backend refuses to enable it without one and discards the PIN when it is turned off.
+  let lanAccessSaved = false;
+  let askLanPin = false;
+
   async function saveApp() {
     if (!appConfig) return;
-    const result = await api.saveApplicationConfig(appConfig);
-    statusMessage = result.restartRequired
-      ? 'Settings saved. Restart the application (quit and reopen) for the network/player-number change to take effect.'
-      : 'General settings saved.';
+    if (appConfig.allowLanAccess && !lanAccessSaved) {
+      askLanPin = true;
+      return;
+    }
+    await persistApp();
+  }
+
+  async function persistApp() {
+    if (!appConfig) return;
+    try {
+      const result = await api.saveApplicationConfig(appConfig);
+      lanAccessSaved = appConfig.allowLanAccess;
+      statusMessage = result.restartRequired
+        ? 'Settings saved. Restart the application (quit and reopen) for the network/player-number change to take effect.'
+        : 'General settings saved.';
+    } catch {
+      statusMessage = 'The settings could not be saved. LAN access can only be changed on the device the server runs on.';
+    }
+  }
+
+  function lanPinCreated() {
+    askLanPin = false;
+    void persistApp();
+  }
+
+  function lanPinCancelled() {
+    askLanPin = false;
+    if (appConfig) appConfig.allowLanAccess = false;
+    statusMessage = 'LAN access stays off because no PIN was created.';
   }
 
   async function saveOutputs() {
@@ -218,10 +252,15 @@
               <span class="label">Web UI port</span>
               <span class="control"><input type="number" bind:value={appConfig.webUiPort} /></span>
             </label>
-            <label class="check" title="Allows access to the web UI from other devices on the same network, not just from this computer.">
-              <input type="checkbox" bind:checked={appConfig.allowLanAccess} />
-              Allow LAN access
+            <label class="check" title="Allows access to the web UI from other devices on the same network, not just from this computer. Needs a restart. Turning it on asks you to create a PIN that other devices need to change mixer or CDJ settings or press buttons.">
+              <input type="checkbox" bind:checked={appConfig.allowLanAccess} disabled={$remoteInfo !== null && !$remoteInfo.local} />
+              Allow LAN access (restart required)
             </label>
+            {#if $remoteInfo && !$remoteInfo.local}
+              <p class="hint">LAN access can only be changed on the device the server runs on.</p>
+            {:else}
+              <p class="hint">When turned on you create a PIN. Other devices need it to change mixer or CDJ settings or press player buttons.</p>
+            {/if}
             <label class="field" title="Number of decimal places shown for BPM values.">
               <span class="label">BPM decimal places</span>
               <span class="control"><input type="number" min="0" max="4" bind:value={appConfig.bpmDecimalPlaces} /></span>
@@ -408,6 +447,7 @@
         {:else}
           <p class="muted">Loading…</p>
         {/if}
+        <RemotePinSettings />
       {/if}
 
       {#if section === 'outputs'}
@@ -502,6 +542,9 @@
       {/if}
     </div>
   </div>
+  {#if askLanPin}
+    <PinSetupDialog onDone={lanPinCreated} onCancel={lanPinCancelled} />
+  {/if}
 </div>
 
 <style>

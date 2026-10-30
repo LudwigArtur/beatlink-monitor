@@ -7,6 +7,7 @@ import type {
   CdjRemoteResult,
   RemoteUnlockInfo,
   RemoteUnlockResult,
+  SetPinResult,
   CdjSnapshot,
   CdjWriteResult,
   MixerSnapshot,
@@ -61,18 +62,28 @@ export const api = {
   getCdj: () => request<CdjSnapshot>('/api/cdj'),
   cdjRefresh: () => request<unknown>('/api/cdj/refresh', { method: 'POST' }),
   cdjWriteSetting: (player: number, offset: number, value: number) =>
-    request<CdjWriteResult>(`/api/cdj/${player}/setting/${offset}`, { method: 'POST', body: JSON.stringify({ value }) }),
+    request<CdjWriteResult>(`/api/cdj/${player}/setting/${offset}`, remoteOptions({ method: 'POST', body: JSON.stringify({ value }) })),
   cdjButton: (player: number, code: number, press: 'click' | 'down' | 'up' = 'click') =>
     request<CdjRemoteResult>(`/api/cdj/${player}/button/${code}?press=${press}`, remoteOptions({ method: 'POST' })),
   cdjRemoteInfo: () => request<RemoteUnlockInfo>('/api/cdj/remote', remoteOptions()),
   cdjRemoteLock: () => request<unknown>('/api/cdj/remote/lock', remoteOptions({ method: 'POST' })),
+  /** Only accepted on the device the server runs on. */
+  cdjRemoteSetPin: async (pin: string): Promise<SetPinResult> => {
+    const response = await fetch(`${API_BASE}/api/cdj/remote/pin`, remoteOptions({ method: 'POST', body: JSON.stringify({ pin }) }));
+    const text = await response.text();
+    try {
+      return JSON.parse(text) as SetPinResult;
+    } catch {
+      return { status: 'FAILED', message: text || 'Not allowed on this device.' };
+    }
+  },
   /** Unlike other calls this one also returns the body of a rejected PIN (403/409/429). */
   cdjRemoteUnlock: async (pin: string): Promise<RemoteUnlockResult> => {
     const response = await fetch(`${API_BASE}/api/cdj/remote/unlock`, remoteOptions({ method: 'POST', body: JSON.stringify({ pin }) }));
     return (await response.json()) as RemoteUnlockResult;
   },
   mixerWriteUtility: (id: number, value: number) =>
-    request<UtilityWriteResult>(`/api/mixer/utility/${id}`, { method: 'POST', body: JSON.stringify({ value }) }),
+    request<UtilityWriteResult>(`/api/mixer/utility/${id}`, remoteOptions({ method: 'POST', body: JSON.stringify({ value }) })),
 
   // --- Outputs -------------------------------------------------------------
   grandMaTest: (bpm: number) =>

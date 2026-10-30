@@ -6,6 +6,9 @@
   import type { AudioLevelStatus, MixerLinkStatus, UtilityItem, UtilityWriteResult } from '../stores/types';
   import { mixerState } from '../websocket/connection';
   import MixerVisual from './MixerVisual.svelte';
+  import RemoteUnlock from './RemoteUnlock.svelte';
+  import { confirmAction } from '../stores/confirm';
+  import { hardwareWritesLocked } from '../stores/remotePin';
 
   let link: MixerLinkStatus | null = null;
   let pollHandle: ReturnType<typeof setInterval> | null = null;
@@ -74,6 +77,8 @@
   }
 
   async function write(item: UtilityItem) {
+    const detail = `${item.label}\n${reported.get(item.id) ?? '–'} → ${shownValue(item)}`;
+    if (!(await confirmAction('Write setting to mixer?', detail, 'Write'))) return;
     writing = { ...writing, [item.id]: true };
     try {
       results = { ...results, [item.id]: await api.mixerWriteUtility(item.id, shownValue(item)) };
@@ -108,6 +113,7 @@
 </script>
 
 <div class="page">
+  <RemoteUnlock />
   <section class="card">
     <div class="row head">
       <h3>{link?.mixerModel ?? 'Mixer'}</h3>
@@ -240,7 +246,7 @@
     <p class="hint">
       Values appear after the mixer has answered a read request. A change is only reported as confirmed after the mixer
       itself reports the new value back.
-      {#if !canWrite}Changing is currently disabled (see above).{/if}
+      {#if !canWrite}Changing is currently disabled (see above).{:else if $hardwareWritesLocked}Enter the PIN at the top of this page to change settings.{/if}
     </p>
     <table>
       <thead><tr><th>Setting</th><th class="num">Mixer reports</th><th>New value</th><th></th><th>Result</th></tr></thead>
@@ -262,7 +268,7 @@
             </td>
             <td class="actions">
               <button on:click={() => api.mixerRead(item.id)} disabled={!link || !link.transportAvailable}>Read</button>
-              <button on:click={() => write(item)} disabled={!canWrite || writing[item.id]}>Write</button>
+              <button on:click={() => write(item)} disabled={!canWrite || $hardwareWritesLocked || writing[item.id]}>Write</button>
             </td>
             <td class:ok={results[item.id]?.status === 'CONFIRMED'}>{results[item.id] ? statusText(results[item.id]) : ''}</td>
           </tr>

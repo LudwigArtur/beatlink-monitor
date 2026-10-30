@@ -1,8 +1,11 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
   import { api } from '../stores/api';
-  import type { CdjDeckFlags, CdjRemoteButton, CdjRemoteResult, CdjSettingItem, CdjSnapshot, CdjWriteResult, RemoteUnlockInfo } from '../stores/types';
+  import type { CdjDeckFlags, CdjRemoteButton, CdjRemoteResult, CdjSettingItem, CdjSnapshot, CdjWriteResult } from '../stores/types';
   import { connectionId } from '../websocket/connection';
+  import { confirmAction, confirmHardwareWrites } from '../stores/confirm';
+  import { hardwareWritesLocked, refreshRemoteInfo } from '../stores/remotePin';
+  import RemoteUnlock from './RemoteUnlock.svelte';
 
   let snapshot: CdjSnapshot | null = null;
   let selected = 0;
@@ -27,44 +30,8 @@
         return `Failed${reason}`;
     }
   }
-  let remoteInfo: RemoteUnlockInfo | null = null;
-  let pin = '';
-  let pinMessage = '';
-
-  async function refreshRemote() {
-    try {
-      remoteInfo = await api.cdjRemoteInfo();
-    } catch (e) {
-      remoteInfo = null;
-    }
-  }
-
-  // The unlock belongs to the WebSocket connection: a new connection starts locked again.
-  $: if ($connectionId !== undefined) {
-    pin = '';
-    pinMessage = '';
-    remoteResult = null;
-    void refreshRemote();
-  }
-
-  async function unlock() {
-    const result = await api.cdjRemoteUnlock(pin);
-    pin = '';
-    pinMessage = {
-      UNLOCKED: '',
-      WRONG_PIN: 'Wrong PIN.',
-      NO_PIN_FILE: 'No PIN file on the server yet.',
-      INVALID_PIN_FILE: 'The PIN file on the server is too short (at least 4 characters).',
-      LOCKED_OUT: `Too many attempts. Try again in ${result.retryAfterSeconds ?? 60} s.`,
-      UNKNOWN_CONNECTION: 'Not connected to the backend; try again in a moment.',
-    }[result.status];
-    await refreshRemote();
-  }
-
-  async function lockAgain() {
-    await api.cdjRemoteLock();
-    await refreshRemote();
-  }
+  // A new connection starts locked again: drop the last button result of the previous one.
+  $: if ($connectionId !== undefined) remoteResult = null;
 
   async function refresh() {
     try {
@@ -105,6 +72,8 @@
 
   async function write(item: CdjSettingItem) {
     const k = key(item.offset);
+    const detail = `Player ${selected}: ${item.label}\n${reported(item.offset) ?? '–'} → ${shown(item)}`;
+    if (!(await confirmAction('Write setting to CDJ?', detail, 'Write'))) return;
     writing = { ...writing, [k]: true };
     try {
       results = { ...results, [k]: await api.cdjWriteSetting(selected, item.offset, shown(item)) };
@@ -132,11 +101,12 @@
   }
 
   async function press(button: CdjRemoteButton, mode: 'click' | 'down' | 'up' = 'click') {
+    if (mode === 'click' && !(await confirmAction('Press button on CDJ?', `Player ${selected}: ${button.label}`, 'Press'))) return;
     try {
       remoteResult = await api.cdjButton(selected, button.code, mode);
     } catch (e) {
       remoteResult = { status: 'FAILED', message: 'Request failed - locked? Enter the PIN again.' };
-      await refreshRemote();
+      await refreshRemoteInfo();
     }
   }
 
@@ -174,6 +144,7 @@
 </script>
 
 <div class="page">
+  <RemoteUnlock />
   <section class="card">
     <div class="row head">
       <h3>CDJs</h3>
@@ -219,7 +190,7 @@
       <h3>Settings · player {device.deviceNumber}</h3>
       <p class="hint">
         A change counts as confirmed only after the CDJ reports the new value back.
-        {#if !canWrite}Changing is currently disabled.{/if}
+        {#if !canWrite}Changing is currently disabled.{:else if $hardwareWritesLocked}Enter the PIN above to change settings.{/if}
       </p>
       <table>
         <thead><tr><th>Setting</th><th class="num">CDJ reports</th><th>New value</th><th></th><th>Result</th></tr></thead>
@@ -236,7 +207,7 @@
                   {#each options(item) as option}<option value={option}>{option}</option>{/each}
                 </select>
               </td>
-              <td class="actions"><button on:click={() => write(item)} disabled={!canWrite || writing[key(item.offset)]}>Write</button></td>
+              <td class="actions"><button on:click={() => write(item)} disabled={!canWrite || $hardwareWritesLocked || writing[key(item.offset)]}>Write</button></td>
               <td class:ok={results[key(item.offset)]?.status === 'CONFIRMED'}>{results[key(item.offset)] ? statusText(results[key(item.offset)]) : ''}</td>
             </tr>
           {/each}
@@ -246,30 +217,15 @@
 
     <section class="card">
       <h3>Remote buttons · player {device.deviceNumber}</h3>
-      {#if !remoteInfo}
-        <p class="hint">Status unknown.</p>
-      {:else if !remoteInfo.unlocked}
-        <p class="hint">
-          Remote buttons act immediately on the player, including during playback, so they are locked. Each device
-          has to unlock them after every connection with the PIN from the file <code>{remoteInfo.pinFileName}</code>
-          in the backend's data directory on the server (create it there; the app never creates it).
-        </p>
-        {#if !remoteInfo.pinFilePresent}<p class="warn">The PIN file does not exist (or is too short) on the server.</p>{/if}
-        <form class="row" on:submit|preventDefault={unlock}>
-          <input type="password" inputmode="numeric" autocomplete="off" placeholder="PIN" aria-label="PIN" bind:value={pin} />
-          <button class="primary" type="submit" disabled={!pin || !remoteInfo.pinFilePresent}>Unlock</button>
-        </form>
-        {#if pinMessage}<p class="warn">{pinMessage}</p>{/if}
+      {#if $hardwareWritesLocked}
+        <p class="hint">Remote buttons act immediately on the player, including during playback. Enter the PIN above to use them.</p>
       {:else}
-        <div class="row head">
-          <p class="warn grow">Unlocked for this connection. Buttons act immediately on the player and are not acknowledged by the CDJ.</p>
-          <button on:click={lockAgain}>Lock again</button>
-        </div>
+        <p class="hint">Buttons act immediately on the player and are not acknowledged by the CDJ.</p>
         {#each groups as group}
           <h4>{group}</h4>
           <div class="row">
             {#each link?.buttons.filter((b) => b.group === group) ?? [] as button (button.code)}
-              {#if button.key === 'cue'}
+              {#if button.key === 'cue' && !$confirmHardwareWrites}
                 <button
                   on:pointerdown={() => holdStart(button)}
                   on:pointerup={holdEnd}
@@ -293,10 +249,6 @@
     margin-bottom: 8px;
   }
   .head h3 {
-    margin: 0;
-  }
-  .grow {
-    flex: 1;
     margin: 0;
   }
   .players {

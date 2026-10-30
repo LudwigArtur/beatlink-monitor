@@ -338,13 +338,21 @@ export interface CdjWriteResult {
 }
 
 export interface RemoteUnlockInfo {
-  pinFileName: string;
-  pinFilePresent: boolean;
+  pinSet: boolean;
   unlocked: boolean;
+  /** True on the device the server runs on: no PIN needed, may create/change the PIN. */
+  local: boolean;
+  /** Whether other devices can reach this UI ("Allow LAN access" is saved as on). */
+  lanAccessEnabled: boolean;
+}
+
+export interface SetPinResult {
+  status: 'SAVED' | 'INVALID' | 'FAILED';
+  message: string | null;
 }
 
 export interface RemoteUnlockResult {
-  status: 'UNLOCKED' | 'WRONG_PIN' | 'NO_PIN_FILE' | 'INVALID_PIN_FILE' | 'LOCKED_OUT' | 'UNKNOWN_CONNECTION';
+  status: 'UNLOCKED' | 'WRONG_PIN' | 'NO_PIN' | 'LOCKED_OUT' | 'UNKNOWN_CONNECTION';
   retryAfterSeconds: number | null;
 }
 

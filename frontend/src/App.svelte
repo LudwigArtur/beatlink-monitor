@@ -8,7 +8,10 @@
   import MaTelnetView from './matelnet/MaTelnetView.svelte';
   import MixerPanel from './components/MixerPanel.svelte';
   import CdjPanel from './components/CdjPanel.svelte';
-  import { connectWebSocket, connectionStatus, diagnostics, masterClock, outputs, players } from './websocket/connection';
+  import PinSetupDialog from './components/PinSetupDialog.svelte';
+  import ConfirmDialog from './components/ConfirmDialog.svelte';
+  import { pinSetupRequired, refreshRemoteInfo } from './stores/remotePin';
+  import { connectWebSocket, connectionId, connectionStatus, diagnostics, masterClock, outputs, players } from './websocket/connection';
   import { activeProfile, initLayout, setFullscreenFlag } from './stores/layout';
 
   type View = 'monitor' | 'liveview' | 'matelnet' | 'mixer' | 'cdj' | 'settings' | 'diagnostics';
@@ -30,13 +33,24 @@
   }
   let mainEl: HTMLElement;
 
+  // The unlock belongs to the WebSocket connection: a new connection starts locked again, so ask the backend again.
+  $: if ($connectionId) void refreshRemoteInfo();
+
   onMount(() => {
     connectWebSocket();
     initLayout();
 
+    // Ask for the PIN setup as soon as the backend answers (it may still be starting).
+    let infoTimer: ReturnType<typeof setTimeout> | undefined;
+    const checkRemoteInfo = async () => {
+      if (!(await refreshRemoteInfo())) infoTimer = setTimeout(checkRemoteInfo, 2000);
+    };
+    void checkRemoteInfo();
+
     document.addEventListener('fullscreenchange', onFullscreenChange);
     window.addEventListener('hashchange', onHashChange);
     return () => {
+      clearTimeout(infoTimer);
       document.removeEventListener('fullscreenchange', onFullscreenChange);
       window.removeEventListener('hashchange', onHashChange);
     };
@@ -121,6 +135,10 @@
       </div>
     </div>
   {/if}
+  {#if $pinSetupRequired}
+    <PinSetupDialog />
+  {/if}
+  <ConfirmDialog />
 </main>
 
 <style>
