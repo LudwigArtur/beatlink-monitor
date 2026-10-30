@@ -200,6 +200,13 @@ export interface MixerState {
   model?: string | null;
   /** 3 or 4 for models checked on real hardware (DJM-A9, DJM-V10), null for unknown models. */
   eqBands?: number | null;
+  /** Channels, per-channel send and isolator of models checked on real hardware (DJM-A9, DJM-V10), null otherwise. */
+  channelCount?: number | null;
+  hasComp?: boolean | null;
+  hasSend?: boolean | null;
+  hasIsolator?: boolean | null;
+  /** What the model calls its per-channel filter knob ("FILTER" or "COLOR"). */
+  filterName?: string | null;
   live: MixerLiveState | null;
   liveTimestampMs: number;
   utilities: UtilityValue[];
@@ -383,6 +390,7 @@ export interface UiProfile {
   backgroundColor: string;
   inactiveDeckBrightnessPercent: number;
   waveformSmoothingFactor: number;
+  waveformGlideJumps: boolean;
   eqWaveformEnabled: boolean;
   eqRawMin: number;
   eqRawCenter: number;

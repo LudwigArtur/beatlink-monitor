@@ -81,7 +81,7 @@
 
   function formatTimestamp(ts: number): string {
     const d = new Date(ts);
-    return d.toLocaleTimeString('de-DE', { hour12: false });
+    return d.toLocaleTimeString('en-GB', { hour12: false });
   }
 
   async function loadOutputsSettings() {
@@ -118,84 +118,94 @@
   });
 </script>
 
-<div class="panel">
-  <div class="settings-toggle-row">
-    <button class="toggle-button" on:click={toggleSettings}>
-      {settingsOpen ? '▾' : '▸'} GrandMA2 Settings
+<div class="page wide panel">
+  <div class="row">
+    <button on:click={toggleSettings} aria-expanded={settingsOpen}>
+      {settingsOpen ? '▾' : '▸'} GrandMA2 settings
     </button>
-    {#if statusMessage}<span class="status">{statusMessage}</span>{/if}
+    {#if statusMessage}<span class="ok">{statusMessage}</span>{/if}
   </div>
 
   {#if settingsOpen && outputsConfig}
-    <div class="settings-drawer">
-      <label title="Enables sending BPM data via Telnet to a grandMA2 console.">
+    <section class="card drawer">
+      <label class="check" title="Enables sending BPM data via Telnet to a grandMA2 console.">
         <input type="checkbox" bind:checked={outputsConfig.grandMa.enabled} />
         Enabled
       </label>
-      <label title="IP address or hostname of the grandMA2 console.">
-        Host
-        <input bind:value={outputsConfig.grandMa.host} />
+      <label class="field" title="IP address or hostname of the grandMA2 console.">
+        <span class="label">Host</span>
+        <span class="control"><input bind:value={outputsConfig.grandMa.host} /></span>
       </label>
-      <label title="Telnet port of the grandMA2 console (default: 30000).">
-        Port
-        <input type="number" bind:value={outputsConfig.grandMa.port} />
+      <label class="field" title="Telnet port of the grandMA2 console (default: 30000).">
+        <span class="label">Port</span>
+        <span class="control"><input type="number" bind:value={outputsConfig.grandMa.port} /></span>
       </label>
-      <label title="Username for the Telnet login on the console.">
-        Username
-        <input bind:value={outputsConfig.grandMa.username} />
+      <label class="field" title="Username for the Telnet login on the console.">
+        <span class="label">Username</span>
+        <span class="control"><input bind:value={outputsConfig.grandMa.username} /></span>
       </label>
-      <label title="Password for the Telnet login on the console.">
-        Password
-        <input type="password" bind:value={outputsConfig.grandMa.password} />
+      <label class="field" title="Password for the Telnet login on the console.">
+        <span class="label">Password</span>
+        <span class="control"><input type="password" bind:value={outputsConfig.grandMa.password} /></span>
       </label>
-      <label class="wide-field" title="Template for the login command. Placeholders are automatically replaced with the configured credentials.">
-        Login Template
-        <textarea rows="2" bind:value={outputsConfig.grandMa.loginTemplate}></textarea>
+      <label class="field" title="Template for the login command. Placeholders are automatically replaced with the configured credentials.">
+        <span class="label">Login template</span>
+        <span class="control"><textarea rows="2" bind:value={outputsConfig.grandMa.loginTemplate}></textarea></span>
       </label>
-      <label class="wide-field" title="Template for the BPM command that is sent. Placeholders are automatically replaced with the current BPM value.">
-        Command Template
-        <textarea rows="2" bind:value={outputsConfig.grandMa.commandTemplate}></textarea>
+      <label class="field" title="Template for the BPM command that is sent. Placeholders are automatically replaced with the current BPM value.">
+        <span class="label">Command template</span>
+        <span class="control"><textarea rows="2" bind:value={outputsConfig.grandMa.commandTemplate}></textarea></span>
       </label>
-      <label title="Minimum BPM change before a new command is sent.">
-        Min. BPM Change
-        <input type="number" step="0.01" bind:value={outputsConfig.grandMa.minimumChange} />
+      <label class="field" title="Minimum BPM change before a new command is sent.">
+        <span class="label">Minimum BPM change</span>
+        <span class="control"><input type="number" step="0.01" bind:value={outputsConfig.grandMa.minimumChange} /></span>
       </label>
-      <label title="Maximum number of commands sent per second, to avoid overloading the console.">
-        Max. Send Rate (Hz)
-        <input type="number" bind:value={outputsConfig.grandMa.maximumRateHz} />
+      <label class="field" title="Maximum number of commands sent per second, to avoid overloading the console.">
+        <span class="label">Maximum send rate (Hz)</span>
+        <span class="control"><input type="number" bind:value={outputsConfig.grandMa.maximumRateHz} /></span>
       </label>
-      <label title="Automatically reconnects if the Telnet connection is interrupted.">
+      <label class="check" title="Automatically reconnects if the Telnet connection is interrupted.">
         <input type="checkbox" bind:checked={outputsConfig.grandMa.reconnect} />
-        Auto-Reconnect
+        Auto-reconnect
       </label>
-      <label title="Periodically sends a keepalive signal to maintain the connection.">
+      <label class="check" title="Periodically sends a keepalive signal to maintain the connection.">
         <input type="checkbox" bind:checked={outputsConfig.grandMa.keepalive} />
         Keepalive
       </label>
-      <h4>Network Adapter</h4>
-      <label title="Determines which network adapter the Telnet connection to the grandMA2 console uses - independent of the adapter used for Pro DJ Link.">
-        Interface Mode
-        <select bind:value={outputsConfig.grandMa.networkInterfaceMode}>
-          <option value="AUTOMATIC">Automatic</option>
-          <option value="MANUAL">Manual</option>
-        </select>
+
+      <h4>Network adapter</h4>
+      <label class="field" title="Determines which network adapter the Telnet connection to the grandMA2 console uses - independent of the adapter used for Pro DJ Link.">
+        <span class="label">Interface mode</span>
+        <span class="control">
+          <select bind:value={outputsConfig.grandMa.networkInterfaceMode}>
+            <option value="AUTOMATIC">Automatic</option>
+            <option value="MANUAL">Manual</option>
+          </select>
+        </span>
       </label>
       {#if outputsConfig.grandMa.networkInterfaceMode === 'MANUAL'}
-        <label title="The network interface used for the Telnet connection to the grandMA2 console.">
-          Interface
-          <select bind:value={outputsConfig.grandMa.manualInterfaceName}>
-            {#each interfaces as iface}
-              <option value={iface.name}>{iface.displayName} ({iface.addresses.join(', ')})</option>
-            {/each}
-          </select>
+        <label class="field" title="The network interface used for the Telnet connection to the grandMA2 console.">
+          <span class="label">Interface</span>
+          <span class="control">
+            <select bind:value={outputsConfig.grandMa.manualInterfaceName}>
+              {#if outputsConfig.grandMa.manualInterfaceName && !interfaces.some((i) => i.name === outputsConfig?.grandMa.manualInterfaceName)}
+                <option value={outputsConfig.grandMa.manualInterfaceName}>{outputsConfig.grandMa.manualInterfaceName} (not available)</option>
+              {/if}
+              {#each interfaces as iface}
+                <option value={iface.name}>{iface.displayName} ({iface.addresses.join(', ')})</option>
+              {/each}
+            </select>
+          </span>
         </label>
       {/if}
-      <div class="row">
-        <button on:click={saveOutputs}>Save Settings</button>
-        <label>Test BPM <input type="number" step="0.01" bind:value={testBpm} /></label>
-        <button on:click={testTelnet}>Send TEST Command</button>
+
+      <div class="row actions">
+        <button class="primary" on:click={saveOutputs}>Save</button>
+        <span class="spacer"></span>
+        <label class="inline">Test BPM <input type="number" step="0.01" bind:value={testBpm} /></label>
+        <button on:click={testTelnet}>Send test command</button>
       </div>
-    </div>
+    </section>
   {/if}
 
   <div class="console" bind:this={consoleEl}>
@@ -213,113 +223,35 @@
 
   <div class="input-row">
     <input
+      class="command"
       placeholder="Enter command and press Enter…"
       bind:value={commandInput}
       on:keydown={onKeydown}
     />
-    <button on:click={sendCommand} disabled={!commandInput.trim()}>Send</button>
+    <button class="primary" on:click={sendCommand} disabled={!commandInput.trim()}>Send</button>
   </div>
 </div>
 
 <style>
-  .panel {
-    display: flex;
-    flex-direction: column;
-    height: calc(100vh - 140px);
-    padding: 16px;
-    color: #eee;
-    font-family: system-ui, sans-serif;
-    gap: 10px;
+  .actions {
+    margin-top: 10px;
   }
-  .settings-toggle-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-  .toggle-button {
-    background: #16171b;
-    color: #ddd;
-    border: 1px solid #2a2b31;
-    border-radius: 6px;
-    padding: 6px 12px;
-    cursor: pointer;
-    font-size: 13px;
-    align-self: flex-start;
-  }
-  .toggle-button:hover {
-    border-color: #4a4b52;
-  }
-  .status {
-    font-size: 12px;
-    color: #a5d6a7;
-  }
-  .settings-drawer {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    background: #16171b;
-    border: 1px solid #24252b;
-    border-radius: 10px;
-    padding: 16px 18px;
-  }
-  .settings-drawer label {
+  .inline {
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 13px;
-  }
-  .settings-drawer label.wide-field {
-    align-items: flex-start;
-  }
-  .settings-drawer input,
-  .settings-drawer select,
-  .settings-drawer textarea {
-    background: #0e0f12;
-    color: #eee;
-    border: 1px solid #3a3b42;
-    border-radius: 6px;
-    padding: 5px 8px;
-    font-family: inherit;
-    font-size: 13px;
-  }
-  .settings-drawer textarea {
-    width: 100%;
-    max-width: 520px;
-    min-height: 44px;
-    resize: vertical;
-  }
-  .settings-drawer h4 {
-    margin: 10px 0 -4px 0;
-    font-size: 12px;
-    color: #999;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    border-top: 1px solid #24252b;
-    padding-top: 10px;
-  }
-  .settings-drawer button {
-    background: #2a2b31;
-    color: #eee;
-    border: 1px solid #3a3b42;
-    border-radius: 6px;
-    padding: 6px 14px;
-    cursor: pointer;
-    font-size: 13px;
-  }
-  .row {
-    display: flex;
-    gap: 10px;
-    align-items: center;
+    color: var(--muted);
   }
   .console {
-    flex: 1;
-    min-height: 0;
+    flex: none;
+    height: 60vh;
+    min-height: 240px;
     overflow-y: auto;
     background: #0a0b0d;
-    border: 1px solid #24252b;
+    border: 1px solid var(--border);
     border-radius: 8px;
     padding: 10px 12px;
-    font-family: ui-monospace, Menlo, monospace;
+    font-family: var(--mono);
     font-size: 12.5px;
   }
   .line {
@@ -339,16 +271,16 @@
     text-align: center;
   }
   .direction-SENT .direction {
-    color: #4fc3f7;
+    color: var(--accent);
   }
   .direction-RECEIVED .direction {
-    color: #81c784;
+    color: var(--ok);
   }
   .direction-INFO .direction {
-    color: #ffb300;
+    color: var(--warn);
   }
   .direction-INFO .text {
-    color: #999;
+    color: var(--muted);
     font-style: italic;
   }
   .empty {
@@ -359,27 +291,8 @@
     display: flex;
     gap: 8px;
   }
-  .input-row input {
+  .command {
     flex: 1;
-    background: #16171b;
-    color: #eee;
-    border: 1px solid #3a3b42;
-    border-radius: 6px;
-    padding: 8px 10px;
-    font-family: ui-monospace, Menlo, monospace;
-    font-size: 13px;
-  }
-  .input-row button {
-    background: #2a2b31;
-    color: #eee;
-    border: 1px solid #3a3b42;
-    border-radius: 6px;
-    padding: 8px 16px;
-    cursor: pointer;
-    font-size: 13px;
-  }
-  .input-row button:disabled {
-    opacity: 0.4;
-    cursor: default;
+    font-family: var(--mono);
   }
 </style>

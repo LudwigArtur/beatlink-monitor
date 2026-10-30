@@ -14,6 +14,19 @@
   let results: Record<string, CdjWriteResult> = {};
   let writing: Record<string, boolean> = {};
   let remoteResult: CdjRemoteResult | null = null;
+
+  function remoteStatusText(result: CdjRemoteResult): string {
+    if (result.status === 'SENT') return 'Sent';
+    const reason = result.message ? `: ${result.message}` : '';
+    switch (result.status) {
+      case 'NO_DEVICE':
+        return `Player not reachable${reason}`;
+      case 'INVALID':
+        return `Unknown button${reason}`;
+      default:
+        return `Failed${reason}`;
+    }
+  }
   let remoteInfo: RemoteUnlockInfo | null = null;
   let pin = '';
   let pinMessage = '';
@@ -127,6 +140,23 @@
     }
   }
 
+  // A held button (CUE) sends "down" on press and "up" on release; the release is also sent when the pointer leaves
+  // the button or the press is cancelled, so the player is never left with a held button.
+  let heldButton: CdjRemoteButton | null = null;
+
+  async function holdStart(button: CdjRemoteButton) {
+    if (heldButton) return;
+    heldButton = button;
+    await press(button, 'down');
+  }
+
+  async function holdEnd() {
+    const button = heldButton;
+    if (!button) return;
+    heldButton = null;
+    await press(button, 'up');
+  }
+
   // [flag, label, verified on real CDJ-3000s]
   const flagRows: [keyof CdjDeckFlags, string, boolean][] = [
     ['tempoReset', 'Tempo Reset', true],
@@ -143,63 +173,70 @@
   const show = (value: boolean | number) => (typeof value === 'boolean' ? (value ? 'on' : 'off') : String(value));
 </script>
 
-<div class="panel">
-  <section>
-    <h3>CDJs</h3>
+<div class="page">
+  <section class="card">
+    <div class="row head">
+      <h3>CDJs</h3>
+      <span class="spacer"></span>
+      <button on:click={() => api.cdjRefresh()} disabled={!link || !link.transportAvailable}>Read now</button>
+    </div>
     {#if error}<p class="warn">{error}</p>{/if}
     {#if link}
-      <ul class="status">
-        <li>Integration: {link.integrationEnabled ? 'on' : 'off'}, socket hooked: {link.transportAvailable ? 'yes' : 'no'}</li>
-        <li>Replies: {link.settingsRepliesReceived} settings, {link.statusRepliesReceived} deck flags</li>
-        <li>Settings changes: {link.controlEnabled ? 'allowed' : 'disabled'}</li>
-        {#if link.lastError}<li class="warn">Last error: {link.lastError}</li>{/if}
-      </ul>
+      <dl class="kv">
+        <dt>Integration</dt><dd>{link.integrationEnabled ? 'enabled' : 'disabled'} (Settings → Mixer &amp; CDJs)</dd>
+        <dt>Pro DJ Link socket</dt><dd>{link.transportAvailable ? 'hooked' : 'not hooked'}</dd>
+        <dt>Replies</dt><dd>{link.settingsRepliesReceived} settings, {link.statusRepliesReceived} deck state</dd>
+        <dt>Changing settings</dt><dd>{link.controlEnabled ? 'allowed' : 'disabled'}</dd>
+      </dl>
+      {#if link.lastError}<p class="warn">Last error: {link.lastError}</p>{/if}
     {/if}
-    <div class="row">
+    <div class="row players">
       {#each snapshot?.devices ?? [] as d (d.deviceNumber)}
         <button class:active={d.deviceNumber === selected} on:click={() => (selected = d.deviceNumber)}>Player {d.deviceNumber}</button>
       {/each}
-      <button on:click={() => api.cdjRefresh()} disabled={!link || !link.transportAvailable}>Read now</button>
     </div>
     {#if !device}<p class="hint">No CDJ has answered yet.</p>{/if}
   </section>
 
   {#if device}
-    <section>
-      <h3>Deck state (player {device.deviceNumber})</h3>
-      <p class="hint">Verified against real CDJ-3000s by switching the function on the player; * = matches a CDJ value but was not switched.</p>
+    <section class="card">
+      <h3>Deck state · player {device.deviceNumber}</h3>
+      <p class="hint">Checked on real CDJ-3000s by switching each function on the player. * = matches a CDJ value, but was not switched.</p>
       {#if device.flags}
-        <table>
+        <table class="state">
           <tbody>
-            <tr><td>Track BPM</td><td>{device.flags.trackBpm.toFixed(2)}</td></tr>
-            <tr><td>Pitch</td><td>{device.flags.pitchPercent.toFixed(2)} %</td></tr>
+            <tr><td>Track BPM</td><td class="num">{device.flags.trackBpm.toFixed(2)}</td></tr>
+            <tr><td>Pitch</td><td class="num">{device.flags.pitchPercent.toFixed(2)} %</td></tr>
             {#each flagRows as [flag, label, verified]}
-              <tr><td>{label}{verified ? '' : ' *'}</td><td>{show(device.flags[flag])}</td></tr>
+              <tr><td>{label}{verified ? '' : ' *'}</td><td class="num">{show(device.flags[flag])}</td></tr>
             {/each}
           </tbody>
         </table>
       {/if}
     </section>
 
-    <section>
-      <h3>Settings (player {device.deviceNumber})</h3>
+    <section class="card">
+      <h3>Settings · player {device.deviceNumber}</h3>
       <p class="hint">
         A change counts as confirmed only after the CDJ reports the new value back.
         {#if !canWrite}Changing is currently disabled.{/if}
       </p>
       <table>
-        <thead><tr><th>Setting</th><th>CDJ reports</th><th>New value</th><th></th><th>Result</th></tr></thead>
+        <thead><tr><th>Setting</th><th class="num">CDJ reports</th><th>New value</th><th></th><th>Result</th></tr></thead>
         <tbody>
           {#each link?.settingItems ?? [] as item (item.offset)}
             <tr>
               <td title={item.note ?? ''}>{item.label}</td>
-              <td>{reported(item.offset) ?? '–'}</td>
+              <td class="num">{reported(item.offset) ?? '–'}</td>
               <td>
                 <select value={shown(item)} on:change={(e) => (pending = { ...pending, [key(item.offset)]: Number((e.target as HTMLSelectElement).value) })}>
+                  {#if reported(item.offset) != null && !options(item).includes(reported(item.offset) ?? 0)}
+                    <option value={reported(item.offset)} disabled>{reported(item.offset)} (outside range)</option>
+                  {/if}
                   {#each options(item) as option}<option value={option}>{option}</option>{/each}
                 </select>
               </td>
-              <td><button on:click={() => write(item)} disabled={!canWrite || writing[key(item.offset)]}>Write</button></td>
+              <td class="actions"><button on:click={() => write(item)} disabled={!canWrite || writing[key(item.offset)]}>Write</button></td>
               <td class:ok={results[key(item.offset)]?.status === 'CONFIRMED'}>{results[key(item.offset)] ? statusText(results[key(item.offset)]) : ''}</td>
             </tr>
           {/each}
@@ -207,8 +244,8 @@
       </table>
     </section>
 
-    <section>
-      <h3>Remote buttons (player {device.deviceNumber})</h3>
+    <section class="card">
+      <h3>Remote buttons · player {device.deviceNumber}</h3>
       {#if !remoteInfo}
         <p class="hint">Status unknown.</p>
       {:else if !remoteInfo.unlocked}
@@ -219,101 +256,72 @@
         </p>
         {#if !remoteInfo.pinFilePresent}<p class="warn">The PIN file does not exist (or is too short) on the server.</p>{/if}
         <form class="row" on:submit|preventDefault={unlock}>
-          <input type="password" inputmode="numeric" autocomplete="off" placeholder="PIN" bind:value={pin} />
-          <button type="submit" disabled={!pin || !remoteInfo.pinFilePresent}>Unlock</button>
+          <input type="password" inputmode="numeric" autocomplete="off" placeholder="PIN" aria-label="PIN" bind:value={pin} />
+          <button class="primary" type="submit" disabled={!pin || !remoteInfo.pinFilePresent}>Unlock</button>
         </form>
         {#if pinMessage}<p class="warn">{pinMessage}</p>{/if}
       {:else}
-        <p class="warn">Unlocked for this connection. These buttons act immediately on the player. Not acknowledged by the CDJ.</p>
-        <div class="row"><button on:click={lockAgain}>Lock again</button></div>
+        <div class="row head">
+          <p class="warn grow">Unlocked for this connection. Buttons act immediately on the player and are not acknowledged by the CDJ.</p>
+          <button on:click={lockAgain}>Lock again</button>
+        </div>
         {#each groups as group}
           <h4>{group}</h4>
           <div class="row">
             {#each link?.buttons.filter((b) => b.group === group) ?? [] as button (button.code)}
               {#if button.key === 'cue'}
-                <button on:mousedown={() => press(button, 'down')} on:mouseup={() => press(button, 'up')}>{button.label} (hold)</button>
+                <button
+                  on:pointerdown={() => holdStart(button)}
+                  on:pointerup={holdEnd}
+                  on:pointerleave={holdEnd}
+                  on:pointercancel={holdEnd}
+                >{button.label} (hold)</button>
               {:else}
                 <button on:click={() => press(button)}>{button.label}</button>
               {/if}
             {/each}
           </div>
         {/each}
-        {#if remoteResult}<p class:ok={remoteResult.status === 'SENT'}>{remoteResult.status}{remoteResult.message ? `: ${remoteResult.message}` : ''}</p>{/if}
+        {#if remoteResult}<p class:ok={remoteResult.status === 'SENT'} class:warn={remoteResult.status !== 'SENT'}>{remoteStatusText(remoteResult)}</p>{/if}
       {/if}
     </section>
   {/if}
 </div>
 
 <style>
-  .panel {
-    padding: 16px;
-    color: #eee;
-    font-family: system-ui, sans-serif;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
-  section {
-    background: #17181d;
-    border: 1px solid #2a2b31;
-    border-radius: 6px;
-    padding: 12px;
-  }
-  h3,
-  h4 {
-    margin: 0 0 8px;
-  }
-  h4 {
-    margin-top: 10px;
-    font-size: 13px;
-    color: #9a9ba3;
-  }
-  .hint {
-    color: #9a9ba3;
-    font-size: 12px;
-  }
-  .warn {
-    color: #ffb300;
-  }
-  .status {
-    list-style: none;
-    padding: 0;
-    margin: 0 0 8px;
-    font-size: 13px;
-  }
-  table {
-    border-collapse: collapse;
-    width: 100%;
-    font-size: 13px;
-  }
-  th,
-  td {
-    text-align: left;
-    padding: 4px 8px;
-    border-bottom: 1px solid #2a2b31;
-  }
-  .ok {
-    color: #66bb6a;
-  }
-  button {
-    background: #2a2b31;
-    color: #eee;
-    border: 1px solid #3a3b42;
-    border-radius: 4px;
-    padding: 4px 8px;
-    cursor: pointer;
-  }
-  button.active {
-    background: #3b5bdb;
-  }
-  button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-  .row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
+  .head {
     margin-bottom: 8px;
+  }
+  .head h3 {
+    margin: 0;
+  }
+  .grow {
+    flex: 1;
+    margin: 0;
+  }
+  .players {
+    margin-top: 12px;
+  }
+  .kv {
+    display: grid;
+    grid-template-columns: minmax(140px, 200px) 1fr;
+    gap: 3px 16px;
+    margin: 0;
+  }
+  .kv dt {
+    color: var(--muted);
+  }
+  .kv dd {
+    margin: 0;
+  }
+  .state {
+    max-width: 360px;
+  }
+  .actions {
+    white-space: nowrap;
+  }
+  .actions button {
+    min-height: 24px;
+    padding: 2px 10px;
   }
 </style>

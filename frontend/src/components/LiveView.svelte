@@ -31,7 +31,7 @@
   // off here if the user prefers all decks shown at full, equal brightness.
   let dimInactive = true;
 
-  // Privacy/"Datenschutz" mode: hides the track title/artist in the
+  // Privacy mode: hides the track title/artist in the
   // overview row (e.g. for streaming/screenshots where the currently
   // played track shouldn't be revealed). Defaults to on.
   let privacyMode = true;
@@ -131,7 +131,7 @@
       >
         <div class="header">
           {#if player && privacyMode}
-            <span class="title privacy-placeholder" title="Datenschutz-Modus aktiv">🔒 Track ausgeblendet</span>
+            <span class="title privacy-placeholder" title="Privacy mode active">🔒 Track hidden</span>
           {:else}
             <span class="title">{player?.title ?? (player ? '—' : 'Not connected')}</span>
             <span class="artist">{player?.artist ?? ''}</span>
@@ -156,10 +156,10 @@
       <span class="zoom-value">{zoomBeats}</span>
       <button on:click={zoomOut} disabled={zoomIndex === zoomLevels.length - 1} aria-label="Zoom out">+</button>
       <button class="dim-toggle" class:active={dimInactive} on:click={() => (dimInactive = !dimInactive)}>
-        Inaktive Decks abdunkeln
+        Dim inactive decks
       </button>
       <button class="dim-toggle" class:active={privacyMode} on:click={() => (privacyMode = !privacyMode)}>
-        🔒 Datenschutz-Modus
+        🔒 Privacy mode
       </button>
       {#if onExit}
         <button class="exit-button" on:click={onExit} title="Exit Live View (Esc)">✕ Exit</button>

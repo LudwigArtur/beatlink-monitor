@@ -4,6 +4,7 @@
   import { eqGains, type BandGains } from '../stores/eq';
   import { applyRgbEq, eqChangesBrightness } from '../stores/eqRender';
   import { activeProfile } from '../stores/layout';
+  import { glideRemainingMs, smoothingParams } from '../stores/smoothing';
   import type { PlayerState } from '../stores/types';
   import { robustMaxHeight } from '../widgets/waveformScale';
 
@@ -52,9 +53,8 @@
   // explicit preference - a real seek is still caught well within a
   // fraction of a second by the hard-resync threshold below, just not
   // instantaneously.
-  const DEAD_ZONE_MS = 120;
-  const HARD_RESYNC_THRESHOLD_MS = 600;
-  $: SOFT_CORRECTION_FACTOR = $activeProfile.waveformSmoothingFactor;
+  // The two smoothest levels widen both thresholds, see stores/smoothing.ts.
+  $: smoothing = smoothingParams($activeProfile.waveformSmoothingFactor);
 
   // The fetched buffer always spans the *entire* track (0..durationMs),
   // fetched exactly once per track load - never on a timer. This mirrors
@@ -201,20 +201,29 @@
       // No valid previous extrapolation to reconcile against - hard resync.
       lastKnownPositionMs = reportedPositionMs;
       lastKnownAtWallClock = Date.now();
-    } else if (player.playing !== lastPlaying || Math.abs((player.pitchPercent ?? 0) - lastPitchPercent) > 0.01) {
+      glideOffsetMs = 0;
+    } else if (
+      player.playing !== lastPlaying ||
+      (!smoothing.continuousPitch && Math.abs((player.pitchPercent ?? 0) - lastPitchPercent) > smoothing.pitchThreshold)
+    ) {
       // Play/pause toggled or pitch changed: the old extrapolation basis no
       // longer applies, so resync immediately rather than waiting for the
       // gentler reconciliation below to (eventually) notice the drift.
-      lastKnownPositionMs = reportedPositionMs;
-      lastKnownAtWallClock = Date.now();
+      reanchor(reportedPositionMs);
     } else {
+      if (smoothing.continuousPitch && Math.abs((player.pitchPercent ?? 0) - lastPitchPercent) > smoothing.pitchThreshold) {
+        // Smoothest levels: a pitch change only changes the playback rate from now on. Re-anchor at the position
+        // predicted with the old rate so the playhead does not jump; the reconciliation below takes care of drift.
+        lastKnownPositionMs = predictedPositionMs();
+        lastKnownAtWallClock = Date.now();
+        lastPitchPercent = player.pitchPercent ?? 0;
+      }
       const error = reportedPositionMs - predictedPositionMs();
-      if (Math.abs(error) > HARD_RESYNC_THRESHOLD_MS) {
+      if (Math.abs(error) > smoothing.hardResyncMs) {
         // A genuine seek/jump happened - snap immediately rather than
         // slowly crawling toward the new position over several seconds.
-        lastKnownPositionMs = reportedPositionMs;
-        lastKnownAtWallClock = Date.now();
-      } else if (Math.abs(error) > DEAD_ZONE_MS) {
+        reanchor(reportedPositionMs);
+      } else if (Math.abs(error) > smoothing.deadZoneMs) {
         // Gentle, continuous reconciliation for genuine small drift (but
         // not pure noise, see `DEAD_ZONE_MS`) - nudging the anchor by only
         // a small fraction of the disagreement each update means any one
@@ -222,7 +231,7 @@
         // in sync over time (rather than letting real clock-rate
         // differences between client and hardware accumulate unbounded
         // over a long track).
-        lastKnownPositionMs = predictedPositionMs() + error * SOFT_CORRECTION_FACTOR;
+        lastKnownPositionMs = predictedPositionMs() + error * smoothing.factor;
         lastKnownAtWallClock = Date.now();
       }
       // else: within the dead zone - pure jitter, deliberately left
@@ -230,6 +239,32 @@
     }
     lastPlaying = player.playing;
     lastPitchPercent = player.pitchPercent ?? 0;
+  }
+
+  // Optional glide: when the playhead is re-anchored because of a real jump, the displayed position keeps its old
+  // value and eases onto the new one (see `glideRemainingMs`) instead of snapping, if enabled in the settings.
+  let glideOffsetMs = 0;
+  let glideStartedAt = 0;
+
+  function reanchor(positionMs: number) {
+    const before = displayedPositionMs();
+    lastKnownPositionMs = positionMs;
+    lastKnownAtWallClock = Date.now();
+    const offset = before - predictedPositionMs();
+    if ($activeProfile.waveformGlideJumps && Math.abs(offset) > 1) {
+      glideOffsetMs = offset;
+      glideStartedAt = Date.now();
+    } else {
+      glideOffsetMs = 0;
+    }
+  }
+
+  /** The position the waveform is drawn at: the real (extrapolated) position plus what is left of a running glide. */
+  function displayedPositionMs(): number {
+    if (glideOffsetMs === 0) return predictedPositionMs();
+    const remaining = glideRemainingMs(glideOffsetMs, Date.now() - glideStartedAt);
+    if (remaining === 0) glideOffsetMs = 0;
+    return predictedPositionMs() + remaining;
   }
 
   function predictedPositionMs(): number {
@@ -579,7 +614,7 @@
     ctx.fillStyle = '#0c0d10';
     ctx.fillRect(0, 0, width, h);
 
-    const center = predictedPositionMs();
+    const center = displayedPositionMs();
     const windowStart = center - beforeMs;
     const windowSpan = beforeMs + afterMs;
     const waveformTop = beatGridStripHeight;

@@ -41,8 +41,8 @@
 
   {#if player && player.connected}
     <div class="track">
-      <div class="title">{player.title ?? '—'}</div>
-      <div class="artist">{player.artist ?? ''}</div>
+      <div class="title" title={player.title ?? ''}>{player.title ?? '—'}</div>
+      <div class="artist" title={player.artist ?? ''}>{player.artist ?? ''}</div>
     </div>
 
     <div class="bpm-row">
@@ -64,7 +64,7 @@
 
     <div class="footer">
       <span>{formatTime(player.playbackPositionMs)} / {formatTime(player.trackDurationMs)}</span>
-      <span>Takt {barNumber(player.beatNumber) ?? '-'} · {player.beatWithinBar ?? '-'}/4</span>
+      <span>Bar {barNumber(player.beatNumber) ?? '-'} · {player.beatWithinBar ?? '-'}/4</span>
       <span class="status">{player.playing ? '▶ Playing' : player.paused ? '⏸ Paused' : '⏹'}</span>
     </div>
   {:else}
@@ -76,34 +76,30 @@
   .card {
     position: relative;
     width: 100%;
-    background: #202127;
-    border: 1px solid #2d2e36;
-    border-radius: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
     padding: 12px 14px;
-    color: #eee;
-    font-family: system-ui, sans-serif;
     font-size: 14px;
     box-sizing: border-box;
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
   }
   .card.master {
-    border-color: #ffb300;
-    box-shadow: 0 0 0 1px #ffb300 inset;
+    border-color: var(--warn);
   }
   .card.offline {
-    opacity: 0.55;
+    opacity: 0.5;
   }
   .header {
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 0.8em;
-    color: #999;
-    margin-bottom: 4px;
+    font-size: 0.85em;
+    color: var(--muted);
+    margin-bottom: 6px;
   }
   .slot {
-    font-weight: 700;
-    color: #ddd;
+    font-weight: 600;
+    color: var(--text);
   }
   .badges {
     margin-left: auto;
@@ -111,52 +107,64 @@
     gap: 4px;
   }
   .badge {
-    font-size: 0.65em;
-    padding: 1px 5px;
+    font-size: 0.7em;
+    padding: 0 6px;
+    line-height: 16px;
     border-radius: 3px;
-    font-weight: 700;
-  }
-  .master-badge { background: #ffb300; color: #201c00; }
-  .onair-badge { background: #e53935; color: #fff; }
-  .loop-badge { background: #ffeb3b; color: #201c00; }
-  .track .title {
-    font-size: 1.15em;
     font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+  .master-badge { background: var(--warn); color: #1c1400; }
+  .onair-badge { background: var(--bad); color: #fff; }
+  .loop-badge { background: transparent; border: 1px solid var(--warn); color: var(--warn); }
+  .track .title {
+    font-size: 1.1em;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .track .artist {
     font-size: 0.85em;
-    color: #aaa;
+    color: var(--muted);
     margin-bottom: 6px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-height: 1.2em;
   }
   .bpm-row {
     display: flex;
-    gap: 16px;
-    margin: 6px 0;
+    gap: 20px;
+    margin: 6px 0 8px;
   }
   .label {
     display: block;
     font-size: 0.7em;
-    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
   }
   .value {
     font-size: 1.05em;
     font-variant-numeric: tabular-nums;
   }
   .value.highlight {
-    color: #4fc3f7;
-    font-weight: 700;
+    color: var(--accent);
+    font-weight: 600;
   }
   .footer {
     display: flex;
     justify-content: space-between;
     font-size: 0.8em;
-    color: #999;
-    margin-top: 6px;
+    color: var(--muted);
+    margin-top: 8px;
+    font-variant-numeric: tabular-nums;
   }
   .disconnected {
     padding: 18px 0;
     text-align: center;
-    color: #777;
+    color: var(--muted);
     font-size: 0.9em;
   }
 </style>

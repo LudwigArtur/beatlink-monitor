@@ -36,8 +36,8 @@
   .grid {
     display: grid;
     grid-template-columns: repeat(var(--columns), minmax(280px, 1fr));
-    gap: 16px;
-    padding: 16px;
+    gap: 12px;
+    padding: 16px 20px;
   }
   .cell {
     display: flex;

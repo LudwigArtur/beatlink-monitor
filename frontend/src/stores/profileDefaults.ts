@@ -44,6 +44,7 @@ export function defaultProfile(name = 'default'): UiProfile {
     backgroundColor: '#101014',
     inactiveDeckBrightnessPercent: 50,
     waveformSmoothingFactor: 0.08,
+    waveformGlideJumps: true,
     eqWaveformEnabled: true,
     eqRawMin: 0,
     eqRawCenter: 128,

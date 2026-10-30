@@ -12,7 +12,22 @@
   import { activeProfile, initLayout, setFullscreenFlag } from './stores/layout';
 
   type View = 'monitor' | 'liveview' | 'matelnet' | 'mixer' | 'cdj' | 'settings' | 'diagnostics';
-  let view: View = 'monitor';
+
+  // The current page is kept in the URL hash (#settings), so a reload or a bookmark returns to it. The Live View
+  // is never restored this way: it is entered explicitly and needs a user gesture for fullscreen.
+  const restorableViews: View[] = ['monitor', 'matelnet', 'mixer', 'cdj', 'settings', 'diagnostics'];
+  function viewFromHash(): View {
+    const name = window.location.hash.replace('#', '');
+    return restorableViews.find((v) => v === name) ?? 'monitor';
+  }
+
+  let view: View = viewFromHash();
+  $: if (view !== 'liveview' && window.location.hash !== `#${view}`) {
+    history.replaceState(null, '', `#${view}`);
+  }
+  function onHashChange() {
+    if (view !== 'liveview') view = viewFromHash();
+  }
   let mainEl: HTMLElement;
 
   onMount(() => {
@@ -20,7 +35,11 @@
     initLayout();
 
     document.addEventListener('fullscreenchange', onFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
+    window.addEventListener('hashchange', onHashChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', onFullscreenChange);
+      window.removeEventListener('hashchange', onHashChange);
+    };
   });
 
   function onFullscreenChange() {
@@ -66,37 +85,40 @@
       onExit={exitLiveView}
     />
   {:else}
-    <GlobalBar
-      masterClock={$masterClock}
-      outputs={$outputs}
-      diagnostics={$diagnostics}
-      connectionStatus={$connectionStatus}
-    />
+    <div class="ui">
+      <header class="topbar">
+        <nav aria-label="Main">
+          <button class:active={view === 'monitor'} on:click={() => (view = 'monitor')}>Monitor</button>
+          <button class:active={view === 'matelnet'} on:click={() => (view = 'matelnet')}>MA Telnet</button>
+          <button class:active={view === 'mixer'} on:click={() => (view = 'mixer')}>Mixer</button>
+          <button class:active={view === 'cdj'} on:click={() => (view = 'cdj')}>CDJs</button>
+          <button class:active={view === 'settings'} on:click={() => (view = 'settings')}>Settings</button>
+          <button class:active={view === 'diagnostics'} on:click={() => (view = 'diagnostics')}>Diagnostics</button>
+          <button class="liveview-nav-button" on:click={openLiveView}>▶ Live View</button>
+        </nav>
+        <GlobalBar
+          masterClock={$masterClock}
+          outputs={$outputs}
+          diagnostics={$diagnostics}
+          connectionStatus={$connectionStatus}
+        />
+      </header>
 
-    <nav>
-      <button class:active={view === 'monitor'} on:click={() => (view = 'monitor')}>Monitor</button>
-      <button class="liveview-nav-button" on:click={openLiveView}>▶ Live View</button>
-      <button class:active={view === 'matelnet'} on:click={() => (view = 'matelnet')}>MA Telnet</button>
-      <button class:active={view === 'mixer'} on:click={() => (view = 'mixer')}>Mixer</button>
-      <button class:active={view === 'cdj'} on:click={() => (view = 'cdj')}>CDJs</button>
-      <button class:active={view === 'settings'} on:click={() => (view = 'settings')}>Settings</button>
-      <button class:active={view === 'diagnostics'} on:click={() => (view = 'diagnostics')}>Diagnostics</button>
-    </nav>
-
-    <div class="scaled-content" style:transform={`scale(${$activeProfile.globalScale})`}>
-      {#if view === 'monitor'}
-        <PlayerGrid players={$players} masterClock={$masterClock} slots={$activeProfile.playerSlots} />
-      {:else if view === 'matelnet'}
-        <MaTelnetView />
-      {:else if view === 'mixer'}
-        <MixerPanel />
-      {:else if view === 'cdj'}
-        <CdjPanel />
-      {:else if view === 'settings'}
-        <SettingsPanel />
-      {:else if view === 'diagnostics'}
-        <DiagnosticsView diagnostics={$diagnostics} />
-      {/if}
+      <div class="scaled-content" style:transform={`scale(${$activeProfile.globalScale})`}>
+        {#if view === 'monitor'}
+          <PlayerGrid players={$players} masterClock={$masterClock} slots={$activeProfile.playerSlots} />
+        {:else if view === 'matelnet'}
+          <MaTelnetView />
+        {:else if view === 'mixer'}
+          <MixerPanel />
+        {:else if view === 'cdj'}
+          <CdjPanel />
+        {:else if view === 'settings'}
+          <SettingsPanel />
+        {:else if view === 'diagnostics'}
+          <DiagnosticsView diagnostics={$diagnostics} />
+        {/if}
+      </div>
     </div>
   {/if}
 </main>
@@ -120,46 +142,50 @@
   .scaled-content {
     transform-origin: top left;
   }
-  nav {
+  .topbar {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 10px 16px;
-    background: #101114;
-    border-bottom: 1px solid #2a2b31;
     flex-wrap: wrap;
+    gap: 8px 24px;
+    padding: 0 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+  nav {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 2px;
   }
   nav button {
     background: none;
-    border: 1px solid transparent;
-    color: #999;
-    padding: 7px 14px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 500;
-    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    color: var(--muted);
+    padding: 10px 12px 8px;
+    min-height: 0;
   }
-  nav button:hover {
-    color: #ddd;
-    border-color: #2a2b31;
+  nav button:hover:not(:disabled) {
+    background: none;
+    color: var(--text);
   }
   nav button.active {
-    background: #2a2b31;
-    color: #fff;
+    background: none;
+    border-bottom-color: var(--accent);
+    color: var(--text);
   }
-  /* The Live View is the primary destination once everything else is
-     configured (requirements specification: the most important button after setup), so
-     it stands out visually from the other, more administrative nav
-     entries. */
+  /* The Live View is the main destination once everything is set up, so it keeps a visible outline. */
   nav button.liveview-nav-button {
-    background: linear-gradient(135deg, #4fc3f7, #2196f3);
-    color: #06141c;
-    font-weight: 700;
-    box-shadow: 0 1px 4px rgba(33, 150, 243, 0.4);
+    align-self: center;
+    margin-left: 10px;
+    padding: 3px 10px;
+    border: 1px solid var(--accent);
+    border-radius: var(--radius);
+    color: var(--accent);
   }
-  nav button.liveview-nav-button:hover {
-    filter: brightness(1.08);
-    border-color: transparent;
+  nav button.liveview-nav-button:hover:not(:disabled) {
+    background: rgba(90, 169, 255, 0.12);
+    color: var(--accent);
   }
 </style>

@@ -11,36 +11,23 @@
 </script>
 
 <!--
-  All status widgets are always shown, in a fixed order - there is no
-  per-widget visibility/ordering configuration anymore (simplification:
-  these are small, always-relevant status indicators, not something users
-  need to curate).
+  Compact status area: master tempo on the left, connection indicators on the right. All indicators are always
+  shown in a fixed order, there is no per-widget configuration (they are small status lights, not something to curate).
 -->
 <div class="bar">
-  <div class="metric">
-    <span class="label">Master BPM</span>
-    <span class="value">{masterClock.valid ? masterClock.effectiveBpm?.toFixed(2) : '--'}</span>
-  </div>
-  <div class="metric">
-    <span class="label">Master Player</span>
-    <span class="value">{masterClock.valid ? `#${masterClock.masterPlayerNumber}` : '--'}</span>
+  <div class="master" title="Tempo master">
+    <span class="bpm">{masterClock.valid ? masterClock.effectiveBpm?.toFixed(2) : '--'}</span>
+    <span class="unit">BPM</span>
+    <span class="player">{masterClock.valid ? `Master #${masterClock.masterPlayerNumber}` : 'No master'}</span>
   </div>
 
-  <div class="status-group">
-    <span class="dot" class:ok={connectionStatus === 'open'} title="Pro DJ Link / WebSocket"></span>
-    <span>Network</span>
-  </div>
-  <div class="status-group">
-    <span class="dot" class:ok={diagnostics?.proDjLinkRunning}></span>
-    <span>Pro DJ Link</span>
-  </div>
-  <div class="status-group">
-    <span class="dot" class:ok={link?.connected}></span>
-    <span>Ableton Link</span>
-  </div>
-  <div class="status-group">
-    <span class="dot" class:ok={grandMa?.connected}></span>
-    <span>GrandMA2</span>
+  <div class="status" aria-label="Connection status">
+    <span class="item" title="Connection between this page and the backend">
+      <span class="dot" class:ok={connectionStatus === 'open'}></span>Backend
+    </span>
+    <span class="item"><span class="dot" class:ok={diagnostics?.proDjLinkRunning}></span>Pro DJ Link</span>
+    <span class="item"><span class="dot" class:ok={link?.connected}></span>Ableton Link</span>
+    <span class="item"><span class="dot" class:ok={grandMa?.connected}></span>GrandMA2</span>
   </div>
 </div>
 
@@ -48,46 +35,36 @@
   .bar {
     display: flex;
     align-items: center;
-    gap: 24px;
-    padding: 8px 16px;
-    background: #16171b;
-    border-bottom: 1px solid #2a2b31;
-    color: #eee;
-    font-family: system-ui, sans-serif;
     flex-wrap: wrap;
+    gap: 6px 24px;
+    margin-left: auto;
+    padding: 6px 0;
   }
-  .metric {
+  .master {
     display: flex;
-    flex-direction: column;
-    line-height: 1.1;
+    align-items: baseline;
+    gap: 6px;
   }
-  .metric .label {
-    font-size: 10px;
-    color: #888;
-  }
-  .metric .value {
-    font-size: 20px;
-    font-weight: 700;
+  .bpm {
+    font-size: 18px;
+    font-weight: 600;
     font-variant-numeric: tabular-nums;
   }
-  .status-group {
+  .unit,
+  .player {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .status {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 16px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .item {
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 12px;
-    color: #bbb;
-  }
-  .status-group:last-of-type {
-    margin-left: auto;
-  }
-  .dot {
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
-    background: #c62828;
-    display: inline-block;
-  }
-  .dot.ok {
-    background: #43a047;
   }
 </style>
