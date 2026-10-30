@@ -58,25 +58,45 @@ CDJ settings above, or by the user at the device, and watching which byte change
 
 Note: turning SYNC off does not return a deck to its fader tempo; the deck kept the synced tempo until the pitch fader was moved.
 
-## Remote buttons
+## PIN and confirmation for writes
 
-Remote buttons act on live playback, so they are locked behind a PIN that only someone with access to the server can set:
+Everything that writes to a DJM or CDJ (mixer settings, CDJ settings, remote buttons) acts on live equipment. Other devices
+on the network therefore have to enter a PIN first, and every write has to be confirmed in a popup:
 
-1. Create the file `remote-pin.txt` in the backend's data directory (on macOS `~/Library/Application Support/BeatLinkMonitor/`)
-   with the PIN on its first non-empty line, at least 4 characters. The application never creates or changes this file;
-   without it nothing can be unlocked. A changed PIN applies immediately, no restart. Restrict the file, e.g. `chmod 600`.
-2. In the CDJs tab, enter the PIN. The unlock belongs to that browser's WebSocket connection (identified by a random id
-   the server hands out at connect): closing the page, reloading it or losing the connection locks it again, so **every
-   device has to enter the PIN again after every connect**. "Lock again" locks it at once.
-3. Wrong PINs are limited: 5 failures from one address lock that address for 60 s, 15 failures from anywhere lock all attempts
+1. **The PIN is created when LAN access is turned on.** In Settings, General, ticking "Allow LAN access" and saving first asks
+   the device the server runs on for a PIN (4 to 64 characters, no spaces; the dialog can be cancelled, then LAN access stays
+   off). This happens every time LAN access is turned on: turning it off discards the PIN. The backend refuses to turn LAN
+   access on without a PIN, and only the local device may change this setting. If the setting is on at startup but no PIN
+   exists (for example the configuration file was edited by hand), the local device's UI asks for a PIN before anything else.
+2. **The PIN is not stored as text.** Only a salted PBKDF2-SHA256 hash (120,000 rounds) is kept, in
+   `security/remote-pin.hash` in the data directory (owner-only permissions), so it cannot be looked up. A forgotten PIN is
+   replaced by turning LAN access off and on again, or under Settings, Mixer & CDJs, Safety, "Change PIN". A changed PIN
+   locks all other devices again. A plain `remote-pin.txt` of an earlier version is ignored and deleted when the PIN changes.
+3. **The device the server runs on** (the Mac running the app, or the Pi with its screen) is the "local" device. It needs no PIN
+   and is the only one that can create or change the PIN and the LAN setting. A request counts as local if it comes from a
+   loopback or one of the machine's own addresses, has no proxy headers (`X-Forwarded-*`, `Forwarded`, `X-Real-IP`), names
+   `localhost` or an IP address in the `Host` header and is not cross-origin. Opening the app by the machine's host name
+   instead of an IP address therefore counts as a remote device.
+4. **Every other device** has to enter the PIN, in the CDJs or Mixer tab, before it can write anything. The unlock belongs to
+   that browser's WebSocket connection (identified by a random id the server hands out at connect): closing the page,
+   reloading it or losing the connection locks it again, so **every device has to enter the PIN again after every
+   connect**. "Lock again" locks it at once. The backend enforces this for all three kinds of writes (answer 403 otherwise);
+   reading is not restricted.
+5. Wrong PINs are limited: 5 failures from one address lock that address for 60 s, 15 failures from anywhere lock all attempts
    for 60 s. The PIN is compared in constant time.
+6. **Confirmation popup.** In the web UI every settings write and every button press asks for confirmation first (Cancel is
+   focused, Escape cancels). Under Settings, Mixer & CDJs, Safety, "Confirm every write and button press" can be switched off
+   for the current session only: it is not saved and is on again after reloading the page. While confirmation is on, the CUE
+   button is a single press; the hold behaviour (down on press, up on release) is available when it is off. The confirmation is
+   a feature of the web UI, not of the API.
 
 A connect frame is sent before the first press and repeated every 5 s while buttons are used; the session ends 60 s after the
 last press. Codes: 20 play/pause, 21 cue (down/up), 13 sync, 12 master, 14 master tempo, 10 quantize, 11 slip, 22 reverse,
 23 slip reverse, 70–77 hot cue A–H, 80–87 delete hot cue A–H, 30/31/32/34/35/36 loop functions, 40–55 beat loops, 90–103 beat
 jumps. Which codes a given model accepts is unknown; slip (11) was tried on a CDJ-3000 and toggled the slip flag. The frame
 carries the name `CDJ-2000NXS2`, as the reference application does. This protects against other devices on the network, it
-is not a substitute for keeping the web UI off untrusted networks (`allowLanAccess`).
+is not a substitute for keeping the web UI off untrusted networks (`allowLanAccess`). Other application settings (outputs,
+profiles, integration options) are not covered by the PIN.
 
 ## API
 
@@ -84,10 +104,13 @@ is not a substitute for keeping the web UI off untrusted networks (`allowLanAcce
 | --- | --- |
 | `GET /api/cdj` | devices (settings by offset, flags) and link status |
 | `POST /api/cdj/refresh` | read everything now |
-| `POST /api/cdj/{player}/setting/{offset}` body `{"value": n}` | write one setting; answers `CONFIRMED`, `MISMATCH`, `NO_REPLY`, `INVALID`, `NO_DEVICE` or `CONTROL_DISABLED` |
-| `GET /api/cdj/remote` | PIN file present? unlocked? (header `X-Connection-Id`: the id from the `hello` WebSocket message) |
-| `POST /api/cdj/remote/unlock` body `{"pin": "..."}` | unlock this connection (`UNLOCKED`, `WRONG_PIN`, `NO_PIN_FILE`, `INVALID_PIN_FILE`, `LOCKED_OUT`, `UNKNOWN_CONNECTION`) |
+| `POST /api/cdj/{player}/setting/{offset}` body `{"value": n}` | write one setting; needs an unlocked connection or the local device (otherwise 403); answers `CONFIRMED`, `MISMATCH`, `NO_REPLY`, `INVALID`, `NO_DEVICE` or `CONTROL_DISABLED` |
+| `GET /api/cdj/remote` | PIN set? unlocked? local device? LAN access on? (header `X-Connection-Id`: the id from the `hello` WebSocket message) |
+| `POST /api/cdj/remote/unlock` body `{"pin": "..."}` | unlock this connection (`UNLOCKED`, `WRONG_PIN`, `NO_PIN`, `LOCKED_OUT`, `UNKNOWN_CONNECTION`) |
+| `POST /api/cdj/remote/pin` body `{"pin": "..."}` | create or change the PIN, local device only (otherwise 403); `SAVED`, `INVALID` (400) or `FAILED` (500) |
 | `POST /api/cdj/remote/lock` | lock this connection again |
-| `POST /api/cdj/{player}/button/{code}?press=click\|down\|up` | remote button; needs an unlocked connection (otherwise 403); answers `SENT` or an error |
+| `POST /api/cdj/{player}/button/{code}?press=click\|down\|up` | remote button; needs an unlocked connection or the local device (otherwise 403); answers `SENT` or an error |
+| `POST /api/mixer/utility/{id}` | mixer write, same rule |
+| `POST /api/config/application` | turning `allowLanAccess` on needs a PIN (409) and the local device (403) |
 
 Writes and button presses are refused when the request carries a foreign `Origin` header.

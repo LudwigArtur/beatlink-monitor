@@ -29,7 +29,7 @@ a proposed order of work. It is a planning document, not a promise.
 | Mixer audio levels | yes (`0x57`/`0x58`) | works on a real DJM-V10 and DJM-A9 (streams unasked, 512-byte frames), meters in the Mixer tab |
 | CDJ settings read (42 items) / write | yes (`0x6b`/`0x6c`, UDP 50002) | read and write verified on CDJ-3000s, see [CDJ_CONTROL.md](CDJ_CONTROL.md) |
 | CDJ deck state (BPM, pitch, sync, key sync, slip, quantize, ...) | yes (`0x68`/`0x69`) | yes, all offsets but one identified on CDJ-3000s |
-| Remote buttons (play, cue, hot cues, loops, beat jump) | yes (`0x07`, UDP 50001) | yes, behind a server-side PIN per connection; slip tried on a CDJ-3000 |
+| Remote buttons (play, cue, hot cues, loops, beat jump) | yes (`0x07`, UDP 50001) | yes; other devices need a PIN (also for all mixer/CDJ writes), every write is confirmed in a popup; slip tried on a CDJ-3000 |
 | Outputs | 36 types: MA, OSC, MIDI, Art-Net, sACN, TCNet, ... | grandMA2 Telnet, Ableton Link |
 | Other inputs | StagelinQ, TCNet, LTC/MTC/Art-Net timecode, PSN, DMX in | none |
 | Show logic | node patch editor, cue lists, set lists, tracker | none |

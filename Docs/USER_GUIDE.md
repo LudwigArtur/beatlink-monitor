@@ -59,11 +59,12 @@ on untrusted networks.
 
 The CDJs tab shows, per player, the 42 CDJ settings and the deck state (BPM, pitch, sync, key sync, master tempo, vinyl mode, auto cue,
 quantize ...) as the CDJ reports them. "Write" changes one setting and only reports success after the CDJ
-confirmed the new value. Remote buttons (play, cue, hot cues, loops, beat jumps) act on live playback immediately and are therefore
-locked: create the file `remote-pin.txt` with a PIN (at least 4 characters) in the data directory of the backend
-on the server, then enter that PIN in the CDJs tab. The unlock applies to this one connection only; every device has to
-enter the PIN again after every (re)connect or page reload. See
-[CDJ control](CDJ_CONTROL.md).
+confirmed the new value. Every write and every button press (play, cue, hot cues, loops, beat jumps; they act on live playback
+immediately) asks for confirmation in a popup. Settings / Mixer & CDJs / Safety can switch that off for the current session
+only (on again after a reload). Other devices on the network also have to enter a PIN before they can write anything or press
+a button: the PIN is created on the device the server runs on whenever "Allow LAN access" is turned on (Settings / General),
+is stored only as a hash, and has to be entered again after every (re)connect or page reload. The server device needs no PIN.
+See [CDJ control](CDJ_CONTROL.md).
 
 ## 6. grandMA2 / MA Telnet
 

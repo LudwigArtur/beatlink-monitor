@@ -30,7 +30,7 @@ configuration.
 | `cdjIntegrationEnabled` | true; reads every CDJ's settings and deck flags, restart required (see [CDJ control](CDJ_CONTROL.md)) |
 | `cdjControlEnabled` | true; allows writing CDJ settings (explicit request in the CDJs tab/API, confirmed by read-back) |
 | `webUiPort` | 17812 |
-| `allowLanAccess` | false: loopback only; true: all IPv4 interfaces |
+| `allowLanAccess` | false: loopback only; true: all IPv4 interfaces. Turning it on needs a PIN (created on the server device), which other devices must enter to write to mixers/CDJs; see CDJ_CONTROL.md |
 | `activeProfile` | `default` |
 
 Network/port changes may require a restart; follow UI notices.
