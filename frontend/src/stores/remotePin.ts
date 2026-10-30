@@ -15,10 +15,7 @@ export async function refreshRemoteInfo(): Promise<RemoteUnlockInfo | null> {
   }
 }
 
-/** The server device has to create a PIN as long as other devices can reach the UI but no PIN exists. */
-export const pinSetupRequired = derived(remoteInfo, ($info) => $info?.local === true && $info.lanAccessEnabled && !$info.pinSet);
-
-/** Other devices must unlock first; the server device and unknown state (not loaded yet) are treated as locked/open respectively. */
+/** Other devices must unlock first; unknown state (not loaded yet) counts as open, the backend enforces it anyway. */
 export const hardwareWritesLocked = derived(remoteInfo, ($info) => $info !== null && !$info.unlocked);
 
 export const MIN_PIN_LENGTH = 4;

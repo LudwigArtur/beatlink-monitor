@@ -8,9 +8,8 @@
   import MaTelnetView from './matelnet/MaTelnetView.svelte';
   import MixerPanel from './components/MixerPanel.svelte';
   import CdjPanel from './components/CdjPanel.svelte';
-  import PinSetupDialog from './components/PinSetupDialog.svelte';
   import ConfirmDialog from './components/ConfirmDialog.svelte';
-  import { pinSetupRequired, refreshRemoteInfo } from './stores/remotePin';
+  import { refreshRemoteInfo } from './stores/remotePin';
   import { connectWebSocket, connectionId, connectionStatus, diagnostics, masterClock, outputs, players } from './websocket/connection';
   import { activeProfile, initLayout, setFullscreenFlag } from './stores/layout';
 
@@ -134,9 +133,6 @@
         {/if}
       </div>
     </div>
-  {/if}
-  {#if $pinSetupRequired}
-    <PinSetupDialog />
   {/if}
   <ConfirmDialog />
 </main>

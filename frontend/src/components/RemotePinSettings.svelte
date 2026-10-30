@@ -56,8 +56,11 @@
     </p>
   {:else}
     <p class="hint">
-      {info.pinSet ? 'A PIN is set.' : 'No PIN is set.'} It is stored only as a hash and cannot be displayed. If you forget
-      it, turn LAN access off and on again (General) or change it here. This device needs no PIN.
+      {info.pinSet
+        ? 'A PIN is set.'
+        : 'No PIN is set, so other devices cannot write to mixers or CDJs. Create one below, or turn LAN access off and on again (General).'}
+      It is stored only as a hash and cannot be displayed. If you forget it, change it here or turn LAN access off and on
+      again. This device needs no PIN.
     </p>
     <form on:submit|preventDefault={save}>
       <div class="field">
