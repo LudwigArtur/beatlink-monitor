@@ -129,7 +129,7 @@ waveform brightness and the Mixer tab), its utility settings, and every CDJ's se
 deck flags (CDJs tab). This is **on by default** and includes announcing the app as one
 extra third-party device (number 54-57) on the Pro DJ Link network, which the mixer needs
 before it sends its live state. Changing mixer or CDJ settings only happens on an explicit
-request and is confirmed by read-back. Other devices on the network need a PIN for every such write and for the remote CDJ buttons: the Pi's own screen asks you to create it when you turn on "Allow LAN access" (Settings / General), it is stored only as a hash, and every write is confirmed in a popup (see Docs/CDJ_CONTROL.md). If LAN access is switched on by editing `application.json`, the Pi's screen asks for the PIN at the next start; there is no way to create it without that screen. Restart after
+request and is confirmed by read-back. Other devices on the network need a PIN for every such write and for the remote CDJ buttons: the Pi's own screen asks you to create it when you turn on "Allow LAN access" (Settings / General), it is stored only as a hash, and every write is confirmed in a popup (see Docs/CDJ_CONTROL.md). If LAN access is switched on by editing `application.json`, or was already on, no PIN exists yet and other devices cannot write until you create one on the Pi's screen (Settings / Mixer & CDJs / Safety). Restart after
 changing these options. Checked with a DJM-V10 and a DJM-A9 and four CDJ-3000; see
 [Docs/MIXER_CONTROL.md](../Docs/MIXER_CONTROL.md) and
 [Docs/CDJ_CONTROL.md](../Docs/CDJ_CONTROL.md) in the source repository.

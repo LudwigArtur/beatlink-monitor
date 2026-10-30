@@ -66,8 +66,10 @@ on the network therefore have to enter a PIN first, and every write has to be co
 1. **The PIN is created when LAN access is turned on.** In Settings, General, ticking "Allow LAN access" and saving first asks
    the device the server runs on for a PIN (4 to 64 characters, no spaces; the dialog can be cancelled, then LAN access stays
    off). This happens every time LAN access is turned on: turning it off discards the PIN. The backend refuses to turn LAN
-   access on without a PIN, and only the local device may change this setting. If the setting is on at startup but no PIN
-   exists (for example the configuration file was edited by hand), the local device's UI asks for a PIN before anything else.
+   access on without a PIN, and only the local device may change this setting. Starting the app never asks for a PIN. If LAN
+   access is already on but no PIN exists (an existing configuration, or `application.json` edited by hand), other devices
+   simply cannot write until the local device creates one under Settings, Mixer & CDJs, Safety, "Change PIN" (or turns LAN access
+   off and on again).
 2. **The PIN is not stored as text.** Only a salted PBKDF2-SHA256 hash (120,000 rounds) is kept, in
    `security/remote-pin.hash` in the data directory (owner-only permissions), so it cannot be looked up. A forgotten PIN is
    replaced by turning LAN access off and on again, or under Settings, Mixer & CDJs, Safety, "Change PIN". A changed PIN
