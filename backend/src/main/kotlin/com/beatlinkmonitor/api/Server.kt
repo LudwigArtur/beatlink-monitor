@@ -6,6 +6,7 @@ import com.beatlinkmonitor.config.OutputsConfig
 import com.beatlinkmonitor.config.UiProfile
 import com.beatlinkmonitor.cdj.CdjProtocol
 import com.beatlinkmonitor.cdj.RemoteUnlockStatus
+import com.beatlinkmonitor.cdj.SetPinStatus
 import com.beatlinkmonitor.mixer.MixerSnapshot
 import com.beatlinkmonitor.mixer.UtilityWriteRequest
 import com.beatlinkmonitor.mixer.withModel
@@ -305,8 +306,19 @@ fun Application.apiModule(context: AppContext) {
         post("/api/config/application") {
             val previous = context.applicationConfig
             val body = call.receive<ApplicationConfig>()
+            // Network visibility decides who can reach the PIN-protected hardware writes, so only the device the
+            // server runs on may change it, and turning it on needs a freshly created PIN (see RemoteUnlockService).
+            if (body.allowLanAccess != previous.allowLanAccess && !isLocalClient(call)) {
+                call.respond(HttpStatusCode.Forbidden, "LAN access can only be changed on the device the server runs on")
+                return@post
+            }
+            if (body.allowLanAccess && !previous.allowLanAccess && !context.remoteUnlock.isPinSet()) {
+                call.respond(HttpStatusCode.Conflict, "Create a PIN before turning on LAN access")
+                return@post
+            }
             context.configurationService.saveApplicationConfig(body)
             context.applicationConfig = body
+            if (!body.allowLanAccess) context.remoteUnlock.clearPin()
 
             // Deliberately do NOT restart Pro DJ Link in-process anymore when
             // the network interface or our own virtual player number
@@ -329,7 +341,8 @@ fun Application.apiModule(context: AppContext) {
                 previous.manualInterfaceName != body.manualInterfaceName ||
                 previous.preferredDeviceNumber != body.preferredDeviceNumber ||
                 previous.waveformStylePreference != body.waveformStylePreference ||
-                previous.mixerIntegrationEnabled != body.mixerIntegrationEnabled
+                previous.mixerIntegrationEnabled != body.mixerIntegrationEnabled ||
+                previous.allowLanAccess != body.allowLanAccess
             if (needsRestart) {
                 logger.info { "Pro DJ Link network/hardware-communication settings changed - a full application restart is required to apply them" }
             }
@@ -404,6 +417,8 @@ fun Application.apiModule(context: AppContext) {
                 call.respond(HttpStatusCode.BadRequest)
             } else if (!isTrustedOrigin(call)) {
                 call.respond(HttpStatusCode.Forbidden, "Cross-origin mixer writes are not allowed")
+            } else if (!hardwareWriteAllowed(context, call)) {
+                call.respond(HttpStatusCode.Forbidden, PIN_REQUIRED_MESSAGE)
             } else {
                 val body = call.receive<UtilityWriteRequest>()
                 call.respond(context.mixerLink.writeUtility(id, body.value))
@@ -422,13 +437,33 @@ fun Application.apiModule(context: AppContext) {
                 call.respond(HttpStatusCode.BadRequest)
             } else if (!isTrustedOrigin(call)) {
                 call.respond(HttpStatusCode.Forbidden, "Cross-origin CDJ writes are not allowed")
+            } else if (!hardwareWriteAllowed(context, call)) {
+                call.respond(HttpStatusCode.Forbidden, PIN_REQUIRED_MESSAGE)
             } else {
                 val body = call.receive<UtilityWriteRequest>()
                 call.respond(context.cdjLink.writeSetting(player, offset, body.value))
             }
         }
-        // Remote buttons are unlocked per WebSocket connection with the PIN from remote-pin.txt on the server.
-        get("/api/cdj/remote") { call.respond(context.remoteUnlock.info(call.request.headers[CONNECTION_HEADER])) }
+        // Writes to DJMs and CDJs are unlocked per WebSocket connection with the PIN created when LAN access was turned on.
+        // The device the server runs on needs no PIN; only it may create or change the PIN.
+        get("/api/cdj/remote") {
+            call.respond(
+                context.remoteUnlock.info(call.request.headers[CONNECTION_HEADER], isLocalClient(call), context.applicationConfig.allowLanAccess),
+            )
+        }
+        post("/api/cdj/remote/pin") {
+            if (!isLocalClient(call)) {
+                call.respond(HttpStatusCode.Forbidden, "Only the device the server runs on can change the PIN")
+            } else {
+                val result = context.remoteUnlock.setPin(call.receive<RemoteUnlockRequest>().pin)
+                val code = when (result.status) {
+                    SetPinStatus.SAVED -> HttpStatusCode.OK
+                    SetPinStatus.INVALID -> HttpStatusCode.BadRequest
+                    SetPinStatus.FAILED -> HttpStatusCode.InternalServerError
+                }
+                call.respond(code, result)
+            }
+        }
         post("/api/cdj/remote/unlock") {
             if (!isTrustedOrigin(call)) {
                 call.respond(HttpStatusCode.Forbidden)
@@ -461,8 +496,8 @@ fun Application.apiModule(context: AppContext) {
                 call.respond(HttpStatusCode.BadRequest)
             } else if (!isTrustedOrigin(call)) {
                 call.respond(HttpStatusCode.Forbidden, "Cross-origin CDJ control is not allowed")
-            } else if (!context.remoteUnlock.isUnlocked(call.request.headers[CONNECTION_HEADER])) {
-                call.respond(HttpStatusCode.Forbidden, "Remote buttons are locked: enter the PIN first")
+            } else if (!hardwareWriteAllowed(context, call)) {
+                call.respond(HttpStatusCode.Forbidden, PIN_REQUIRED_MESSAGE)
             } else {
                 call.respond(context.cdjLink.pressButton(player, code, press))
             }
@@ -532,6 +567,17 @@ private const val CONNECTION_HEADER = "X-Connection-Id"
 
 @kotlinx.serialization.Serializable
 private data class RemoteUnlockRequest(val pin: String)
+
+private const val PIN_REQUIRED_MESSAGE = "Writing to mixers and CDJs from this device is locked: enter the PIN first"
+
+/** Writes to a DJM or CDJ: the server device always, every other device only after it entered the PIN. */
+private fun hardwareWriteAllowed(context: AppContext, call: ApplicationCall): Boolean =
+    context.remoteUnlock.isUnlocked(call.request.headers[CONNECTION_HEADER], isLocalClient(call))
+
+/** See [LocalClient]; a cross-origin browser page never counts as the local device. */
+private fun isLocalClient(call: ApplicationCall): Boolean =
+    isTrustedOrigin(call) &&
+        LocalClient.isLocal(call.request.local.remoteAddress, call.request.headers["Host"], call.request.headers.names())
 
 private fun newConnectionId(): String {
     val bytes = ByteArray(16).also { java.security.SecureRandom().nextBytes(it) }

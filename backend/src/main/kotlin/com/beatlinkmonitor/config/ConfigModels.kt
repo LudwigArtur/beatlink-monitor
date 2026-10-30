@@ -57,9 +57,10 @@ data class ApplicationConfig(
     //   (requests are harmless reads). Needs the mixer integration's socket hook.
     // - cdjControlEnabled: allow *writing* CDJ settings (explicit request
     //   only; counts as confirmed after the CDJ reports the new value).
-    // Remote CDJ buttons (play, cue, hot cues ...) act on live playback and
-    // are therefore not a setting: every client has to enter the PIN from
-    // remote-pin.txt in the data directory after each connect (see
+    // Remote CDJ buttons (play, cue, hot cues ...) and writes to mixer or CDJ
+    // settings act on live equipment and are therefore not a plain setting:
+    // every client except the server device itself has to enter the PIN that
+    // was created when LAN access was turned on, after each connect (see
     // Docs/CDJ_CONTROL.md).
     val cdjIntegrationEnabled: Boolean = true,
     val cdjControlEnabled: Boolean = true,

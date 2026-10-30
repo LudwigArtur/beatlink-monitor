@@ -46,7 +46,10 @@ class AppContext(
         { mixerTransport.ensureInstalled() },
         { peerAnnouncer.status() },
     ).also { mixerTransport.identityOverride = { peerAnnouncer.activeIdentity() } }
-    val remoteUnlock = RemoteUnlockService(pinFile = { java.io.File(configurationService.rootDir, RemoteUnlockService.PIN_FILE_NAME) })
+    val remoteUnlock = RemoteUnlockService(
+        pinFile = { java.io.File(java.io.File(configurationService.rootDir, RemoteUnlockService.SECURITY_DIR_NAME), RemoteUnlockService.PIN_STORE_NAME) },
+        legacyPinFile = { java.io.File(configurationService.rootDir, RemoteUnlockService.LEGACY_PIN_FILE_NAME) },
+    )
     val audioLevels: AudioLevelService = AudioLevelService(applicationState, { applicationConfig }, mixerTransport.audioTransport)
     val cdjLink: CdjLinkService = CdjLinkService(applicationState, { applicationConfig }, mixerTransport)
     val outputManager = OutputManager(applicationState, configurationService)
