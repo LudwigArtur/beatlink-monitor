@@ -13,6 +13,8 @@ class MixerModelsTest {
         assertEquals(4, MixerModels.eqBands("DJM-V10-LF"))
         assertEquals(3, MixerModels.eqBands("DJM-A9"))
         assertEquals(3, MixerModels.eqBands(" djm-a9 "))
+        assertEquals(6, MixerModels.find("DJM-V10")?.channels)
+        assertEquals(true, MixerModels.find("DJM-V10")?.hasIsolator)
     }
 
     @Test
@@ -33,6 +35,11 @@ class MixerModelsTest {
 
         assertEquals("DJM-A9", state.model)
         assertEquals(3, state.eqBands)
+        assertEquals(4, state.channelCount)
+        assertEquals(false, state.hasComp)
+        assertEquals("COLOR", state.filterName)
+        assertEquals(false, state.hasSend)
+        assertEquals(false, state.hasIsolator)
         assertNull(MixerState().withModel(players.take(1)).model)
     }
 }

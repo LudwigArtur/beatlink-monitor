@@ -26,6 +26,12 @@ data class MixerState(
     val model: String? = null,
     /** 3 or 4 for models checked on real hardware, null if the model is unknown. */
     val eqBands: Int? = null,
+    /** Channels, per-channel send and isolator of models checked on real hardware; null for unknown models. */
+    val channelCount: Int? = null,
+    val hasComp: Boolean? = null,
+    val hasSend: Boolean? = null,
+    val hasIsolator: Boolean? = null,
+    val filterName: String? = null,
 )
 
 @Serializable

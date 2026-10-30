@@ -71,6 +71,9 @@ data class UiProfile(
     // Display) since "how smooth vs. how precise" is a matter of taste that
     // depends on the specific hardware/network's jitter characteristics.
     val waveformSmoothingFactor: Double = 0.08,
+    // Live View: a real jump of the playhead (seek, hot cue, loop jump) is shown
+    // as a short, smooth glide to the new position instead of an instant snap.
+    val waveformGlideJumps: Boolean = true,
     // Mixer EQ -> waveform brightness (needs Settings -> Mixer integration and
     // a mixer sending live knob positions). A band's brightness is
     // [eqMinBrightness] at the raw value [eqRawMin] (knob fully down, 0 on a
