@@ -41,7 +41,7 @@ Then open `http://127.0.0.1:17812/` in a browser.
 The web interface is included in the JAR; no separate frontend server is needed.
 
 1. Make sure the computer is on the Pro DJ Link network (select the right adapter in
-   **Settings / Network**). Players and a DJM mixer appear in **Monitor** within seconds.
+   **Settings / General** (Network card)). Players and a DJM mixer appear in **Monitor** within seconds.
 2. Check the display in **Monitor**, **Live View** and **Mixer**.
 3. Leave outputs disabled initially. Configure and enable them deliberately
    only after testing.

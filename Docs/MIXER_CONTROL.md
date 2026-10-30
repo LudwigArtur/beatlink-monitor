@@ -41,7 +41,7 @@ center (127); its meaning is not understood.
 
 ## Settings
 
-Settings → Mixer (all on by default; changing the first needs a restart):
+Settings → Mixer & CDJs (all on by default; changing the first needs a restart):
 
 1. **Enable mixer integration.** The backend wraps the Pro DJ Link status socket (UDP 50002)
    of `beat-link` so that the mixer packet types `beat-link` ignores can be received, and
@@ -75,7 +75,7 @@ affected. Without live data (no mixer, or no packet for 5 s) waveforms are
 drawn at full brightness.
 
 The raw value scale was verified on a real DJM-V10 (0 = knob fully down, detent at exactly
-`0x80`, 255 = fully up). The Mixer tab shows the raw values; Settings → Mixer lets you set
+`0x80`, 255 = fully up). The Mixer tab shows the raw values; Settings → Mixer & CDJs lets you set
 the raw values for "knob fully down" (default 0) and "knob at center" (default
 128). The mid band follows Hi-Mid on 3-band mixers (they keep their single mid
 knob there and leave Lo-Mid at 0 on all channels) and the average of Hi-Mid and Lo-Mid
@@ -188,7 +188,7 @@ a few seconds after the third-party identity (number 54, category 5) came online
 it streamed `0x39` at 4-6 Hz, answered `0x30`/`0x3a`, and each CDJ-3000 started
 sending an additional status frame to that identity (see below).
 
-Settings → Mixer → **Announce as third-party device (experimental)** therefore
+Settings → Mixer & CDJs → **Announce as third-party device (experimental)** therefore
 makes Beat Link Monitor additionally announce, from a separate socket, like
 ShowKontrol does (device number 54, the first free of 54-57):
 

@@ -99,7 +99,7 @@ mouse during normal operation.
 
 ## 4. Initial configuration
 
-Select the correct **Pro DJ Link network interface** under Settings / Network,
+Select the correct **Pro DJ Link network interface** under Settings / General (Network card),
 especially if the Pi has Wi-Fi plus a separate Ethernet adapter.
 
 Two ways to configure:
@@ -124,7 +124,7 @@ Check the resulting layout rather than assuming one value suits every panel.
 
 ### Mixer and CDJ integration
 
-Under Settings / Mixer the application reads a DJM mixer's live EQ/fader state (for the
+Under Settings / Mixer & CDJs the application reads a DJM mixer's live EQ/fader state (for the
 waveform brightness and the Mixer tab), its utility settings, and every CDJ's settings and
 deck flags (CDJs tab). This is **on by default** and includes announcing the app as one
 extra third-party device (number 54-57) on the Pro DJ Link network, which the mixer needs

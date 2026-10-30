@@ -10,8 +10,15 @@ on the model, firmware, network and available analysis information.
 - **Monitor** shows player information, tempo, master status and waveforms.
 - **Live View** is the dedicated fullscreen waveform view.
   Leaving fullscreen returns to the Monitor view.
+- If the Live View waveforms twitch, raise **Settings / Display / Waveform smoothness**. The levels
+  Smoother and Smoothest ignore more position jitter and keep the playhead steady while a pitch fader
+  moves; the cost is that a real jump (seeking in the track) is caught a little later.
+- **Settings / Display / Glide jumps** (on by default) shows real jumps (seeking, hot cue, loop exit)
+  as a short fluid movement of 0.3–0.8 s instead of snapping. Switch it off to see jumps instantly.
 - Configure display slots in **Settings**: fixed player number, current tempo
   master or disabled.
+- The current page is kept in the address (for example `#settings`), so reloading the
+  browser returns to the same page.
 - Adjust scaling, background and profiles for different displays.
   Profiles can be saved, loaded, imported and exported.
 
@@ -22,7 +29,7 @@ Not all data is available without analysis information.
 
 1. Connect the computer by Ethernet to an authorized DJ network.
 2. Select automatic adapter selection or a specific manual network adapter in
-   **Settings / Network**.
+   **Settings / General** (Network card).
 3. Use automatic virtual player numbering or choose an unused number.
    Do not force a number that is already occupied.
 4. After network or waveform format changes, follow restart notices and
@@ -37,8 +44,13 @@ A format preference does not guarantee that a device can provide it.
 The **Mixer** tab shows the live state of a DJM mixer (EQ, faders, crossfader, FX), its firmware
 version and its utility settings (balance, limiters, output attenuation, mic routing ...). The
 channel EQ also dims the matching part of the waveform of the player on the same channel number.
+For the DJM-V10 and DJM-A9 the live state is drawn as a stylized top view of the mixer: channel strips
+with trim, EQ, filter/color, cue lamps, crossfader assignment, fader and level meter, plus master level
+and meters, booth, headphones, isolator (V10), beat FX and the crossfader. Hover a control to see its raw
+value; the drawing scales with the window and scrolls sideways on very narrow screens. Other mixer models
+show a table of the raw values instead.
 Reading needs the mixer integration and the third-party identity (both on by default, see
-**Settings / Mixer** and [MIXER_CONTROL.md](MIXER_CONTROL.md)). A setting is only changed when you
+**Settings / Mixer & CDJs** and [MIXER_CONTROL.md](MIXER_CONTROL.md)). A setting is only changed when you
 press **Write** and counts as confirmed only after the mixer reports the new value back.
 Anyone who can reach the web interface can change mixer settings, so keep **Allow LAN Access** off
 on untrusted networks.
