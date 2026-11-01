@@ -8,7 +8,10 @@
 | Windows | `%APPDATA%\BeatLinkMonitor\` |
 | Linux | `$XDG_CONFIG_HOME/beatlink-monitor/`, otherwise `~/.config/beatlink-monitor/` |
 
-Files: `application.json`, `outputs.json`, `profiles/*.json`.
+Files: `application.json`, `outputs.json`, `profiles/*.json`, and `logs/beatlink-monitor.log`. The log starts a new file every
+day and whenever one reaches 50 MB; 14 days and at most 1 GB are kept. Set `BEATLINK_LOG_LEVEL` (default `INFO`) to change the
+level; `BEATLINK_LIBRARY_LOG_LEVEL=INFO` additionally enables the detailed track-loading messages of the Beat-Link library
+(waveforms, beat grids, metadata, database connections), which are limited to errors by default.
 The current `configVersion` is 1. Prefer editing settings through the UI;
 stop the application and create a backup before manual edits.
 Files in [config](../config/) are examples, not automatically loaded production
