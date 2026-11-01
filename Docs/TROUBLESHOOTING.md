@@ -34,6 +34,18 @@
   should not be confused with actual precise position data.
 - Restart after changing the adapter or waveform format.
 
+### VPN clients and network filters (macOS)
+
+VPN clients and security software install network content filters that look at every new connection, and they keep running
+when the VPN is not used. A leftover Cisco AnyConnect 4.10 socket filter was the likely cause of the show of 31 October 2026:
+the macOS hang reports showed the filter and the application blocking each other while sockets were closed, and the USB
+adapter's packet input stood still meanwhile (pings answered up to 20 s late, all players vanishing, no new connections to the
+console or the players' databases, the application hanging when quitting). Check with `systemextensionsctl list` and
+`pgrep -fl acsock`, and remove such software completely (for Cisco: `sudo /opt/cisco/anyconnect/bin/anyconnect_uninstall.sh`,
+then remove the extension under System Settings, Login Items & Extensions, and restart the Mac). Test with another adapter if
+the dropouts continue without it. The application now closes its sockets on a background thread with a time limit when it
+quits, so quitting is no longer held up by such a lock.
+
 ### Players drop out, tracks and waveforms stay "loading"
 
 A banner below the top bar (and the **Pro DJ Link network** card in Diagnostics) shows what the application sees:
