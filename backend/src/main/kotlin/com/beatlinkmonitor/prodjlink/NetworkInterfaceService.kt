@@ -20,6 +20,18 @@ data class NetworkInterfaceInfo(
  */
 object NetworkInterfaceService {
 
+    /** Interface name prefixes that can never be the Pro DJ Link or console network (macOS tunnels, AirDrop, ...). */
+    private val virtualPrefixes = listOf("utun", "awdl", "llw", "gif", "stf", "anpi", "ap", "pktap", "p2p")
+
+    /**
+     * Whether an interface can be offered for Pro DJ Link or an output: not a tunnel or other virtual macOS interface
+     * and with an IPv4 address (the Pro DJ Link network and the consoles are IPv4 only). A VPN tunnel (`utun7`) used to
+     * be offered, and shown as the "local IP" in the diagnostics, ahead of the real Ethernet adapter.
+     */
+    fun isUsable(name: String, addresses: List<String>): Boolean =
+        virtualPrefixes.none { name.startsWith(it) && name.drop(it.length).all(Char::isDigit) } &&
+            addresses.any { Regex("""\d{1,3}(\.\d{1,3}){3}""").matches(it) }
+
     fun listInterfaces(): List<NetworkInterfaceInfo> = try {
         NetworkInterface.getNetworkInterfaces().toList()
             .filter { it.isUp && !it.isLoopback }
@@ -30,6 +42,7 @@ object NetworkInterfaceService {
                     addresses = nif.inetAddresses.toList().mapNotNull { it.hostAddress },
                 )
             }
+            .filter { isUsable(it.name, it.addresses) }
     } catch (e: Exception) {
         logger.error(e) { "Failed to enumerate network interfaces" }
         emptyList()

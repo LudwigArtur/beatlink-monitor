@@ -24,6 +24,15 @@ object BpmMath {
         return bpm.multiply(pitchFactor, PRECISION).toDouble()
     }
 
+    /**
+     * The effective BPM of a player: computed from the track BPM and the pitch when the track BPM is known, otherwise the
+     * tempo the device update itself reports - but only if that update carries a real track BPM. Without a loaded track
+     * a CDJ reports the sentinel 65535 (655.35 BPM), which times the pitch would show up as e.g. 621.93.
+     */
+    fun resolveEffective(originalBpm: Double?, pitchPercent: Double, rawReportedBpm: Int, reportedEffectiveTempo: Double): Double? =
+        originalBpm?.let { effectiveBpm(it, pitchPercent) }
+            ?: reportedEffectiveTempo.takeIf { rawReportedBpm in 1..65534 && it.isFinite() }
+
     /** Rounds a BPM value for display, default two decimal places (requirements specification §7.3). */
     fun format(bpm: Double, decimals: Int = 2): Double =
         BigDecimal(bpm).setScale(decimals, RoundingMode.HALF_UP).toDouble()

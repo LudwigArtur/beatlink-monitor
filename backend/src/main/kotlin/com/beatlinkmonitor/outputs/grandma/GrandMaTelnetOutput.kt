@@ -396,6 +396,7 @@ class GrandMaTelnetOutput(
     private suspend fun sendCommand(command: String, force: Boolean) {
         try {
             sendRaw(command)
+            logger.debug { "GrandMA2 command sent: $command" }
             status.set(status.get().copy(lastSentAt = System.currentTimeMillis(), lastSentPayload = command))
         } catch (e: Exception) {
             val wasConnected = status.get().connected

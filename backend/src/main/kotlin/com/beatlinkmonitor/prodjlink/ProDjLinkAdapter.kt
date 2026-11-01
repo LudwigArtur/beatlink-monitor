@@ -299,7 +299,7 @@ class ProDjLinkAdapter(
             // 65535 is the CDJ's sentinel for "no track loaded" (beat-link CdjStatus#getBpm).
             val originalBpm = if (update.bpm in 1..65534) update.bpm / 100.0 else player.originalBpm
             val pitchPercent = org.deepsymmetry.beatlink.Util.pitchToPercentage(update.pitch.toLong())
-            val effectiveBpm = originalBpm?.let { BpmMath.effectiveBpm(it, pitchPercent) }
+            val effectiveBpm = BpmMath.resolveEffective(originalBpm, pitchPercent, update.bpm, update.effectiveTempo)
 
             var updated = player.copy(
                 deviceType = type,
@@ -307,7 +307,7 @@ class ProDjLinkAdapter(
                 tempoMaster = update.isTempoMaster,
                 pitchPercent = pitchPercent,
                 originalBpm = originalBpm,
-                effectiveBpm = effectiveBpm ?: update.effectiveTempo,
+                effectiveBpm = effectiveBpm,
                 beatWithinBar = if (update.isBeatWithinBarMeaningful) update.beatWithinBar else player.beatWithinBar,
                 playbackPositionMs = positionMs ?: player.playbackPositionMs,
             )

@@ -39,14 +39,15 @@ fun bootstrapBackend(context: AppContext) {
     Runtime.getRuntime().addShutdownHook(
         Thread {
             logger.info { "Shutting down..." }
-            runCatching { context.outputManager.stopAll() }
+            // One step that hangs in the kernel must not keep the others from running (see BoundedShutdown).
+            BoundedShutdown.run("outputs") { context.outputManager.stopAll() }
             runCatching { context.packetRecorder.stop() }
             runCatching { context.peerAnnouncer.stop() }
             runCatching { context.audioLevels.stop() }
             runCatching { context.cdjLink.stop() }
             runCatching { context.mixerLink.stop() }
-            runCatching { context.proDjLinkAdapter.stop() }
-            runCatching { context.apiServer?.stop(1_000, 2_000) }
+            BoundedShutdown.run("pro-dj-link") { context.proDjLinkAdapter.stop() }
+            BoundedShutdown.run("web-server") { context.apiServer?.stop(1_000, 2_000) }
         },
     )
 

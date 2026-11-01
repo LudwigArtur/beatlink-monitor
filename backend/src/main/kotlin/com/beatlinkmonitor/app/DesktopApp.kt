@@ -180,13 +180,14 @@ class DesktopApp : Application() {
     }
 
     private fun shutdown() {
-        runCatching { context.outputManager.stopAll() }
-        runCatching { context.proDjLinkAdapter.stop() }
+        // This runs on the JavaFX thread, and closing sockets must never block it (see BoundedShutdown).
+        BoundedShutdown.run("outputs") { context.outputManager.stopAll() }
+        BoundedShutdown.run("pro-dj-link") { context.proDjLinkAdapter.stop() }
         // Must explicitly stop the embedded Netty engine: its worker threads
         // are not daemon threads by default, so without this the JVM process
         // would keep running in the background indefinitely even after this
         // window has closed and Platform.exit() has shut down the FX toolkit.
-        runCatching { context.apiServer?.stop(1_000, 2_000) }
+        BoundedShutdown.run("web-server") { context.apiServer?.stop(1_000, 2_000) }
         Platform.exit()
     }
 

@@ -44,12 +44,15 @@ class DiagnosticsService(
         val grandMa = statuses.firstOrNull { it.name == "GrandMA2 Telnet" }
         val link = statuses.firstOrNull { it.name == "Ableton Link" }
         val master = applicationState.masterClock.value
+        val network = proDjLinkAdapter.networkHealth()
+        val interfaces = NetworkInterfaceService.listInterfaces()
         return DiagnosticsSnapshot(
             applicationVersion = version,
             javaVersion = System.getProperty("java.version") ?: "unknown",
             operatingSystem = "${System.getProperty("os.name")} ${System.getProperty("os.version")}",
-            networkInterfaces = NetworkInterfaceService.listInterfaces().map { it.name },
-            localIp = NetworkInterfaceService.listInterfaces().flatMap { it.addresses }.firstOrNull(),
+            networkInterfaces = interfaces.map { it.name },
+            // The address Pro DJ Link actually uses; before it runs, the first IPv4 address of a usable interface.
+            localIp = network.boundAddress ?: interfaces.flatMap { it.addresses }.firstOrNull { it.contains('.') },
             proDjLinkRunning = proDjLinkAdapter.isRunning(),
             discoveredDevices = applicationState.players.value.size,
             currentMasterPlayer = master.masterPlayerNumber,
@@ -60,7 +63,7 @@ class DiagnosticsService(
             uiWebSocketConnections = uiWebSocketConnections,
             logDirectory = System.getProperty("BEATLINK_LOG_DIR") ?: System.getenv("BEATLINK_LOG_DIR") ?: ".",
             ownDeviceNumber = proDjLinkAdapter.ownDeviceNumber(),
-            network = proDjLinkAdapter.networkHealth(),
+            network = network,
         )
     }
 }
