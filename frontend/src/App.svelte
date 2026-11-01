@@ -9,6 +9,7 @@
   import MixerPanel from './components/MixerPanel.svelte';
   import CdjPanel from './components/CdjPanel.svelte';
   import ConfirmDialog from './components/ConfirmDialog.svelte';
+  import NetworkBanner from './components/NetworkBanner.svelte';
   import { refreshRemoteInfo } from './stores/remotePin';
   import { connectWebSocket, connectionId, connectionStatus, diagnostics, masterClock, outputs, players } from './websocket/connection';
   import { activeProfile, initLayout, setFullscreenFlag } from './stores/layout';
@@ -116,6 +117,8 @@
           connectionStatus={$connectionStatus}
         />
       </header>
+
+      <NetworkBanner network={$diagnostics?.network ?? null} />
 
       <div class="scaled-content" style:transform={`scale(${$activeProfile.globalScale})`}>
         {#if view === 'monitor'}

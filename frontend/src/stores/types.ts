@@ -81,6 +81,20 @@ export interface DiagnosticsSnapshot {
   uiWebSocketConnections: number;
   logDirectory: string;
   ownDeviceNumber: number | null;
+  network: NetworkHealth;
+}
+
+/** Health of the Pro DJ Link network connection, see NetworkHealth.kt in the backend. */
+export interface NetworkHealth {
+  interfaceName: string | null;
+  boundAddress: string | null;
+  currentAddresses: string[];
+  /** The interface no longer has the address Pro DJ Link is bound to: restart the application. */
+  addressChanged: boolean;
+  /** Devices that vanished from the network in the last 10 minutes. */
+  deviceDropouts: number;
+  metadataUnavailablePlayers: number[];
+  unreachablePlayers: number[];
 }
 
 export interface DiagnosticsMessage {

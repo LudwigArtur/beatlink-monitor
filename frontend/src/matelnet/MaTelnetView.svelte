@@ -102,6 +102,11 @@
     statusMessage = 'GrandMA2 settings saved.';
   }
 
+  async function reconnect() {
+    await api.grandMaReconnect();
+    statusMessage = 'Reconnecting…';
+  }
+
   async function testTelnet() {
     await api.grandMaTest(testBpm);
     statusMessage = `Test BPM ${testBpm.toFixed(2)} sent.`;
@@ -123,6 +128,7 @@
     <button on:click={toggleSettings} aria-expanded={settingsOpen}>
       {settingsOpen ? '▾' : '▸'} GrandMA2 settings
     </button>
+    <button on:click={reconnect} title="Drops the connection and connects again at once instead of waiting for the next retry (retries slow down to every 30 s while the console is unreachable).">Reconnect</button>
     {#if statusMessage}<span class="ok">{statusMessage}</span>{/if}
   </div>
 

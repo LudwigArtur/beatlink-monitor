@@ -29,6 +29,34 @@
     </section>
 
     <section class="card">
+      <h3>Pro DJ Link network</h3>
+      <table>
+        <tbody>
+          <tr><td>Interface</td><td>{diagnostics.network.interfaceName ?? '—'}</td></tr>
+          <tr><td>Bound address</td><td>{diagnostics.network.boundAddress ?? '—'}</td></tr>
+          <tr>
+            <td>Addresses of the interface now</td>
+            <td class:bad={diagnostics.network.addressChanged}>
+              {diagnostics.network.currentAddresses.join(', ') || '—'}
+              {#if diagnostics.network.addressChanged}(differs from the bound address: restart the application){/if}
+            </td>
+          </tr>
+          <tr><td>Device dropouts (10 min)</td><td class:warn={diagnostics.network.deviceDropouts >= 4}>{diagnostics.network.deviceDropouts}</td></tr>
+          <tr>
+            <td>Players without track information</td>
+            <td class:warn={diagnostics.network.metadataUnavailablePlayers.length > 0}>
+              {diagnostics.network.metadataUnavailablePlayers.map((p) => `#${p}`).join(', ') || '—'}
+            </td>
+          </tr>
+          <tr>
+            <td>Database port not answering</td>
+            <td>{diagnostics.network.unreachablePlayers.map((p) => `#${p}`).join(', ') || '—'}</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card">
       <p class="hint">
         The <code>beatlink-monitor.log</code> file in the directory above contains detailed technical logs
         (including Pro DJ Link connection status) - helpful if, for example, waveforms, titles, or the playback

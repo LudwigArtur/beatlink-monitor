@@ -88,6 +88,7 @@ export const api = {
   // --- Outputs -------------------------------------------------------------
   grandMaTest: (bpm: number) =>
     request<void>('/api/outputs/grandma/test', { method: 'POST', body: JSON.stringify({ action: 'test', value: bpm }) }),
+  grandMaReconnect: () => request<void>('/api/outputs/grandma/reconnect', { method: 'POST' }),
   getTelnetConsoleHistory: () => request<TelnetConsoleLine[]>('/api/outputs/grandma/console'),
   sendTelnetCommand: (command: string) =>
     request<void>('/api/outputs/grandma/send', { method: 'POST', body: JSON.stringify({ command }) }),
