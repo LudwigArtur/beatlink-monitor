@@ -532,6 +532,14 @@ fun Application.apiModule(context: AppContext) {
             withContext(Dispatchers.IO) { context.outputManager.grandMa.sendUserCommand(body.command) }
             call.respond(HttpStatusCode.OK)
         }
+        post("/api/outputs/grandma/reconnect") {
+            if (!isTrustedOrigin(call)) {
+                call.respond(HttpStatusCode.Forbidden)
+            } else {
+                context.outputManager.grandMa.reconnectNow()
+                call.respond(HttpStatusCode.Accepted)
+            }
+        }
         webSocket("/ws/telnet-console") {
             // New lines sent after this connection opens stream live; the
             // full backlog up to this point is fetched once via the plain

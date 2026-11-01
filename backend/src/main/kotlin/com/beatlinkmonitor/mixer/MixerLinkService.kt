@@ -1,6 +1,7 @@
 package com.beatlinkmonitor.mixer
 
 import com.beatlinkmonitor.config.ApplicationConfig
+import com.beatlinkmonitor.logging.LogThrottle
 import com.beatlinkmonitor.model.DeviceType
 import com.beatlinkmonitor.state.ApplicationState
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -45,6 +46,7 @@ class MixerLinkService(
     private class Reply(val sequence: Long, val value: Int?)
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val logThrottle = LogThrottle()
     private val writeLock = Mutex()
     private val replySequence = AtomicLong()
     private val replies = ConcurrentHashMap<Int, Reply>()
@@ -192,7 +194,10 @@ class MixerLinkService(
             true
         } catch (e: Exception) {
             lastError = "Sending to the mixer failed: ${e.message}"
-            logger.warn(e) { "Mixer utility request failed" }
+            logThrottle.tryAcquire("send:${e.javaClass.simpleName}:${e.message}")?.let { suppressed ->
+                logger.warn { LogThrottle.withSuppressed("Mixer utility request failed: $e", suppressed) }
+                logger.debug(e) { "Mixer utility request failed (details)" }
+            }
             false
         }
     }

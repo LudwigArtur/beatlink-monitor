@@ -62,4 +62,16 @@ class CommandTemplateEngineTest {
         assertEquals("login \"user\" \"***\"", redacted)
         assertFalse(redacted.contains("secret"))
     }
+
+    @Test
+    fun `redaction does not touch a user name that contains the password`() {
+        val redacted = CommandTemplateEngine.redactForLogging("login \"administrator\" \"admin\"", "admin")
+
+        assertEquals("login \"administrator\" \"***\"", redacted)
+    }
+
+    @Test
+    fun `an unquoted password is redacted at its last occurrence`() {
+        assertEquals("login admin2 ***", CommandTemplateEngine.redactForLogging("login admin2 admin", "admin"))
+    }
 }

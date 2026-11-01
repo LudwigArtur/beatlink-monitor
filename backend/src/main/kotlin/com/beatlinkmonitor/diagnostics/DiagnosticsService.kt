@@ -1,6 +1,7 @@
 package com.beatlinkmonitor.diagnostics
 
 import com.beatlinkmonitor.outputs.OutputManager
+import com.beatlinkmonitor.prodjlink.NetworkHealth
 import com.beatlinkmonitor.prodjlink.NetworkInterfaceService
 import com.beatlinkmonitor.prodjlink.ProDjLinkAdapter
 import com.beatlinkmonitor.state.ApplicationState
@@ -23,6 +24,7 @@ data class DiagnosticsSnapshot(
     val uiWebSocketConnections: Int,
     val logDirectory: String,
     val ownDeviceNumber: Int?,
+    val network: NetworkHealth = NetworkHealth(),
 )
 
 /**
@@ -58,6 +60,7 @@ class DiagnosticsService(
             uiWebSocketConnections = uiWebSocketConnections,
             logDirectory = System.getProperty("BEATLINK_LOG_DIR") ?: System.getenv("BEATLINK_LOG_DIR") ?: ".",
             ownDeviceNumber = proDjLinkAdapter.ownDeviceNumber(),
+            network = proDjLinkAdapter.networkHealth(),
         )
     }
 }

@@ -1,6 +1,7 @@
 package com.beatlinkmonitor.outputs.grandma
 
 import com.beatlinkmonitor.config.GrandMaConfig
+import com.beatlinkmonitor.logging.LogThrottle
 import com.beatlinkmonitor.model.MasterClockState
 import com.beatlinkmonitor.outputs.OutputModule
 import com.beatlinkmonitor.outputs.OutputStatus
@@ -61,7 +62,13 @@ class GrandMaTelnetOutput(
 
     override val name: String = "GrandMA2 Telnet"
 
+    private companion object {
+        const val SEND_FAILED_KEY = "send-failed"
+    }
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val logThrottle = LogThrottle(intervalMs = 5 * 60_000L)
+    private var lastFailureKey = "connect-failed"
     private var socketJob: Job? = null
     private var readerJob: Job? = null
     private var watchJob: Job? = null
@@ -123,6 +130,35 @@ class GrandMaTelnetOutput(
         logger.info { "GrandMA2 Telnet output starting (host=${config.host}:${config.port})" }
     }
 
+    /** Drops the current connection (if any) and connects again at once, without waiting for the retry delay. */
+    fun reconnectNow() {
+        if (!config.enabled) return
+        socketJob?.cancel()
+        readerJob?.cancel()
+        closeSocket()
+        status.set(status.get().copy(connected = false))
+        logger.info { "GrandMA2 Telnet reconnect requested" }
+        recordConsoleLine("INFO", "Reconnecting...")
+        socketJob = scope.launch { connectionLoop() }
+    }
+
+    /**
+     * Lets the operating system notice a console that vanished without closing the connection (cable pulled, console
+     * rebooted): keepalive probes start after 10 s of silence and the connection is declared dead after about 25 s.
+     * The fine tuning is not available on every platform or runtime image, so it is best effort.
+     */
+    private fun enableTcpKeepAlive(s: Socket) {
+        runCatching { s.keepAlive = true }
+        runCatching { s.tcpNoDelay = true }
+        try {
+            s.setOption(jdk.net.ExtendedSocketOptions.TCP_KEEPIDLE, 10)
+            s.setOption(jdk.net.ExtendedSocketOptions.TCP_KEEPINTERVAL, 5)
+            s.setOption(jdk.net.ExtendedSocketOptions.TCP_KEEPCOUNT, 3)
+        } catch (_: Throwable) {
+            // Not supported here; the default (hours) keepalive stays.
+        }
+    }
+
     override fun stop() {
         socketJob?.cancel()
         readerJob?.cancel()
@@ -156,9 +192,17 @@ class GrandMaTelnetOutput(
     }
 
     private suspend fun connectionLoop() {
+        var failures = 0
         while (scope.isActive) {
             try {
-                connect()
+                connect(failures)
+                if (failures > 0) {
+                    logger.info { "GrandMA2 Telnet reconnected after $failures failed attempt(s)" }
+                    recordConsoleLine("INFO", "Reconnected after $failures failed attempt(s).")
+                }
+                failures = 0
+                logThrottle.reset(lastFailureKey)
+                logThrottle.reset(SEND_FAILED_KEY)
                 // Stay connected until the socket drops or a send fails elsewhere
                 // (tracked via the shared `connected` status flag), sending
                 // keepalives if requested.
@@ -168,21 +212,32 @@ class GrandMaTelnetOutput(
                     }
                     delay(2_000)
                 }
+                if (scope.isActive) {
+                    logger.info { "GrandMA2 Telnet connection closed: ${status.get().lastError ?: "no longer connected"}" }
+                    recordConsoleLine("INFO", "Connection closed: ${status.get().lastError ?: "no longer connected"}")
+                }
             } catch (e: Exception) {
+                failures++
                 status.set(status.get().copy(connected = false, lastError = e.message))
-                recordConsoleLine("INFO", "Connection lost/failed: ${e.message}")
-                logger.warn { "GrandMA2 Telnet connection lost/failed: ${e.message}" }
+                // A console that stays unreachable would otherwise fill the log (and the console view) every few seconds.
+                lastFailureKey = "connect-failed:${e.message}"
+                if (failures == 1 || failures % 10 == 0) recordConsoleLine("INFO", "Connection lost/failed: ${e.message} (attempt $failures)")
+                logThrottle.tryAcquire(lastFailureKey)?.let { suppressed ->
+                    logger.warn { LogThrottle.withSuppressed("GrandMA2 Telnet connection lost/failed: ${e.message}", suppressed) }
+                }
             }
             closeSocket()
             if (!config.reconnect) break
-            delay(3_000)
+            delay(ReconnectDelay.afterFailures(failures))
         }
     }
 
-    private suspend fun connect() {
+    private suspend fun connect(failedAttempts: Int) {
         socketMutex.withLock {
-            logger.info { "Connecting to GrandMA2 Telnet at ${config.host}:${config.port}" }
-            recordConsoleLine("INFO", "Connecting to ${config.host}:${config.port}...")
+            if (failedAttempts == 0 || failedAttempts % 10 == 0) {
+                logger.info { "Connecting to GrandMA2 Telnet at ${config.host}:${config.port}" }
+                recordConsoleLine("INFO", "Connecting to ${config.host}:${config.port}...")
+            }
             val s = Socket()
             // Bind to the configured outbound network adapter, if one was
             // explicitly selected - independent of whichever adapter Pro DJ
@@ -198,6 +253,8 @@ class GrandMaTelnetOutput(
             }
             s.connect(java.net.InetSocketAddress(config.host, config.port), 5_000)
             s.soTimeout = 2_000
+            enableTcpKeepAlive(s)
+            logger.info { "GrandMA2 Telnet connected from ${s.localAddress?.hostAddress} to ${config.host}:${config.port}" }
             socket = s
             writer = BufferedWriter(OutputStreamWriter(s.getOutputStream(), Charsets.US_ASCII))
             reader = BufferedReader(InputStreamReader(s.getInputStream(), Charsets.US_ASCII))
@@ -291,9 +348,14 @@ class GrandMaTelnetOutput(
      */
     private suspend fun readLoop() {
         val r = reader ?: return
+        var endReason: String? = null
         while (scope.isActive && status.get().connected) {
             try {
-                val line = r.readLine() ?: break // null means the peer closed the connection
+                val line = r.readLine()
+                if (line == null) {
+                    endReason = "The console closed the connection"
+                    break
+                }
                 recordConsoleLine("RECEIVED", line)
                 _receivedLines.emit(line)
             } catch (e: SocketTimeoutException) {
@@ -302,8 +364,14 @@ class GrandMaTelnetOutput(
                 if (status.get().connected) {
                     logger.debug { "MA Telnet read loop ending: ${e.message}" }
                 }
+                endReason = e.message ?: "Read failed"
                 break
             }
+        }
+        // Without this the connection would stay "connected" after the console hung up when keepalives are off,
+        // and nothing would ever reconnect.
+        if (endReason != null && scope.isActive && reader === r && status.get().connected) {
+            status.set(status.get().copy(connected = false, lastError = endReason))
         }
     }
 
@@ -330,8 +398,14 @@ class GrandMaTelnetOutput(
             sendRaw(command)
             status.set(status.get().copy(lastSentAt = System.currentTimeMillis(), lastSentPayload = command))
         } catch (e: Exception) {
+            val wasConnected = status.get().connected
             status.set(status.get().copy(lastError = e.message, connected = false))
-            logger.warn { "Failed to send GrandMA2 command: ${e.message}" }
+            // Every tempo change would log this while the console is away; the connection loop already reports that.
+            if (wasConnected || e !is IllegalStateException) {
+                logThrottle.tryAcquire(SEND_FAILED_KEY)?.let { suppressed ->
+                    logger.warn { LogThrottle.withSuppressed("Failed to send GrandMA2 command: ${e.message}", suppressed) }
+                }
+            }
         }
     }
 

@@ -95,6 +95,25 @@ class ProDjLinkAdapter(
     @Volatile
     private var metadataWatchdogThread: Thread? = null
 
+    private val networkWatch = NetworkWatch()
+    private val metadataBackoff = RestartBackoff(METADATA_RESTART_COOLDOWN_MS, METADATA_RESTART_MAX_COOLDOWN_MS)
+
+    /** Players with a loaded track but no metadata for [METADATA_UNAVAILABLE_AFTER_MS] (as seen by the last watchdog run). */
+    @Volatile
+    private var metadataUnavailable: Set<Int> = emptySet()
+
+    /** Of those, the players whose database port is not even known, i.e. the TCP connection to them fails. */
+    @Volatile
+    private var metadataUnreachable: Set<Int> = emptySet()
+
+    @Volatile
+    private var addressChangeLogged = false
+
+    private var lastHealthLogAt = 0L
+
+    /** What the UI shows about the network connection; cheap enough to call for every diagnostics update. */
+    fun networkHealth(): NetworkHealth = networkWatch.snapshot(metadataUnavailable, metadataUnreachable)
+
     private companion object {
         /** How long a player may show a loaded track without any metadata before we consider the metadata pipeline stuck. */
         const val METADATA_STUCK_THRESHOLD_MS = 90_000L
@@ -104,6 +123,18 @@ class ProDjLinkAdapter(
 
         /** Minimum time after (re)starting before the very first automatic recovery restart may happen, win or lose. */
         const val METADATA_INITIAL_GRACE_MS = 60_000L
+
+        /** The longest the restart cooldown grows to while restarts do not help (it doubles after each one that did not). */
+        const val METADATA_RESTART_MAX_COOLDOWN_MS = 30 * 60_000L
+
+        /** After this long without metadata a player is reported as "metadata unavailable" in the UI (no restart yet). */
+        const val METADATA_UNAVAILABLE_AFTER_MS = 30_000L
+
+        /** From this many device dropouts in 10 minutes the network is reported as unstable. */
+        const val HEALTH_DROPOUTS_WARN = 4
+
+        /** How often the one-line health summary is logged while something is wrong. */
+        const val HEALTH_LOG_INTERVAL_MS = 5 * 60_000L
 
         /** How often the watchdog re-evaluates player state. */
         const val METADATA_WATCHDOG_INTERVAL_MS = 20_000L
@@ -126,6 +157,7 @@ class ProDjLinkAdapter(
 
         override fun deviceLost(announcement: DeviceAnnouncement) {
             logger.info { "Device disconnected: #${announcement.deviceNumber} '${announcement.deviceName}'" }
+            if (started) networkWatch.recordDropout()
             waveformCache.evictForPlayer(announcement.deviceNumber)
             state.removePlayer(announcement.deviceNumber)
         }
@@ -431,6 +463,7 @@ class ProDjLinkAdapter(
 
         safeStart("DeviceFinder") { deviceFinder.start() }
         safeStart("VirtualCdj") { virtualCdj.start() }
+        bindNetworkWatch()
         safeStart("BeatFinder") { beatFinder.start() }
         safeStart("MetadataFinder") { metadataFinder.start() }
         safeStart("WaveformFinder") { waveformFinder.start() }
@@ -471,6 +504,10 @@ class ProDjLinkAdapter(
     fun stop() {
         started = false
         stopMetadataWatchdog()
+        networkWatch.unbind()
+        addressChangeLogged = false
+        metadataUnavailable = emptySet()
+        metadataUnreachable = emptySet()
         safeStop("TimeFinder") { timeFinder.stop() }
         safeStop("BeatGridFinder") { beatGridFinder.stop() }
         safeStop("WaveformFinder") { waveformFinder.stop() }
@@ -505,6 +542,8 @@ class ProDjLinkAdapter(
                 if (!started) break
                 runCatching { checkMetadataHealth() }
                     .onFailure { logger.warn(it) { "Metadata watchdog check failed" } }
+                runCatching { checkNetworkHealth() }
+                    .onFailure { logger.warn(it) { "Network health check failed" } }
             }
         }, "metadata-watchdog").apply { isDaemon = true }
         metadataWatchdogThread = thread
@@ -541,10 +580,15 @@ class ProDjLinkAdapter(
             metadataWatchdogStuckSince.putIfAbsent(deviceNumber, now)
         }
 
+        if (currentlyStuck.isEmpty()) metadataBackoff.recovered()
+        metadataUnavailable = metadataWatchdogStuckSince.filterValues { now - it >= METADATA_UNAVAILABLE_AFTER_MS }.keys.toSet()
+        val connectionManager = org.deepsymmetry.beatlink.dbserver.ConnectionManager.getInstance()
+        metadataUnreachable = metadataUnavailable.filter { runCatching { connectionManager.getPlayerDBServerPort(it) }.getOrDefault(-1) < 0 }.toSet()
+
         val stuckTooLong = metadataWatchdogStuckSince.any { (_, since) -> now - since >= METADATA_STUCK_THRESHOLD_MS }
         if (!stuckTooLong) return
 
-        if (now - lastMetadataStackRestartAt < METADATA_RESTART_COOLDOWN_MS) {
+        if (now - lastMetadataStackRestartAt < metadataBackoff.cooldownMs()) {
             logger.debug { "Metadata watchdog: stuck player(s) detected but still within restart cooldown" }
             return
         }
@@ -555,7 +599,48 @@ class ProDjLinkAdapter(
         }
         restartMetadataStack()
         lastMetadataStackRestartAt = now
+        metadataBackoff.restarted()
         metadataWatchdogStuckSince.clear()
+        logger.info { "Metadata watchdog: next restart not before ${metadataBackoff.cooldownMs() / 60_000} min if the players stay stuck" }
+    }
+
+    /** Remembers the interface and address Pro DJ Link is bound to, to notice later that they changed. */
+    private fun bindNetworkWatch() {
+        val local = runCatching { virtualCdj.localAddress }.getOrNull()
+        val name = local?.let { runCatching { java.net.NetworkInterface.getByInetAddress(it)?.name }.getOrNull() }
+        networkWatch.bind(name, local?.hostAddress)
+        addressChangeLogged = false
+        lastHealthLogAt = System.currentTimeMillis()
+        if (local != null) logger.info { "Pro DJ Link is bound to ${local.hostAddress} on interface ${name ?: "?"}" }
+    }
+
+    /**
+     * Logs once when the interface Pro DJ Link is bound to loses that address (the players are then unreachable until
+     * the application is restarted, see [NetworkHealth.addressChanged]), and a summary line every few minutes while
+     * players drop out or cannot deliver metadata.
+     */
+    private fun checkNetworkHealth() {
+        val health = networkHealth()
+        if (health.addressChanged && !addressChangeLogged) {
+            addressChangeLogged = true
+            logger.warn {
+                "Network address changed: Pro DJ Link is bound to ${health.boundAddress} on ${health.interfaceName}, which now has " +
+                    "${health.currentAddresses.ifEmpty { listOf("no address") }}. The players are unreachable until the application is restarted."
+            }
+        } else if (!health.addressChanged && addressChangeLogged) {
+            addressChangeLogged = false
+            logger.info { "The address ${health.boundAddress} is back on ${health.interfaceName}" }
+        }
+        val now = System.currentTimeMillis()
+        val unhealthy = health.deviceDropouts >= HEALTH_DROPOUTS_WARN || health.metadataUnavailablePlayers.isNotEmpty()
+        if (unhealthy && now - lastHealthLogAt >= HEALTH_LOG_INTERVAL_MS) {
+            lastHealthLogAt = now
+            logger.warn {
+                "Pro DJ Link health: ${health.deviceDropouts} device dropouts in the last 10 min, no metadata for players " +
+                    "${health.metadataUnavailablePlayers} (database port unreachable: ${health.unreachablePlayers}), interface " +
+                    "${health.interfaceName} ${health.currentAddresses}"
+            }
+        }
     }
 
     /**

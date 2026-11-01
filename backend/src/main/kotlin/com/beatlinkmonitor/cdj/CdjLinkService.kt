@@ -1,6 +1,7 @@
 package com.beatlinkmonitor.cdj
 
 import com.beatlinkmonitor.config.ApplicationConfig
+import com.beatlinkmonitor.logging.LogThrottle
 import com.beatlinkmonitor.mixer.MixerTransport
 import com.beatlinkmonitor.model.DeviceType
 import com.beatlinkmonitor.state.ApplicationState
@@ -87,6 +88,7 @@ class CdjLinkService(
     private val settingsReplies = AtomicLong()
     private val statusReplies = AtomicLong()
     @Volatile private var lastError: String? = null
+    private val logThrottle = LogThrottle()
     private var supervisorJob: Job? = null
 
     private class RemoteSession(@Volatile var lastConnectAt: Long, @Volatile var lastCommandAt: Long)
@@ -161,7 +163,11 @@ class CdjLinkService(
         true
     } catch (e: Exception) {
         lastError = "Sending to a CDJ failed: ${e.message}"
-        logger.warn(e) { "CDJ request failed" }
+        // A broken network repeats this every few seconds per player; one line per minute and cause is enough.
+        logThrottle.tryAcquire("send:${e.javaClass.simpleName}:${e.message}")?.let { suppressed ->
+            logger.warn { LogThrottle.withSuppressed("CDJ request failed: $e", suppressed) }
+            logger.debug(e) { "CDJ request failed (details)" }
+        }
         false
     }
 

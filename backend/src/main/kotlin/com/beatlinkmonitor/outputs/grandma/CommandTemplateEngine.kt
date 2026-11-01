@@ -33,6 +33,16 @@ object CommandTemplateEngine {
     }
 
     /** Redacts the password so templates can be safely logged (requirements specification §29.2). */
-    fun redactForLogging(rendered: String, password: String): String =
-        if (password.isNotEmpty()) rendered.replace(password, "***") else rendered
+    fun redactForLogging(rendered: String, password: String): String {
+        if (password.isEmpty()) return rendered
+        // The quoted form first: a plain replace would also hit the same text inside the user name
+        // (user "administrator", password "admin"), which then looked like `***istrator` in the log.
+        val quoted = "\"$password\""
+        return when {
+            rendered.contains(quoted) -> rendered.replace(quoted, "\"***\"")
+            else -> rendered.lastIndexOf(password).let { at ->
+                if (at < 0) rendered else rendered.replaceRange(at, at + password.length, "***")
+            }
+        }
+    }
 }
